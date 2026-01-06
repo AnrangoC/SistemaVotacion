@@ -1,0 +1,18 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Text;
+
+namespace SistemaVotoModelos
+{
+    public class Lista
+    {
+        [Key]
+        public int Id { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+        public string Siglas { get; set; } = string.Empty;
+        public string LogoUrl { get; set; } = string.Empty;
+        // Navegacion
+        public Eleccion? Eleccion { get; set; }
+    }
+}
