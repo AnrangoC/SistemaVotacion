@@ -4,8 +4,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System;
+using SistemaVotoModelos; // Asegúrate de tener esta referencia para usar Rol y los modelos
 
-// Arreglo para que PostgreSQL acepte las fechas de las elecciones
+[cite_start]// Arreglo para que PostgreSQL acepte las fechas de las elecciones [cite: 6]
 System.AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
@@ -13,20 +14,19 @@ var builder = WebApplication.CreateBuilder(args);
 // ---------------- CONFIGURACIÓN DE BASE DE DATOS ----------------
 builder.Services.AddDbContext<APIVotosDbContext>(options =>
 {
-    // 1. Intentamos conectar a la variable de entorno de Render
+    [cite_start]// 1. Intentamos conectar a la variable de entorno de Render [cite: 7]
     var envConnection = Environment.GetEnvironmentVariable("DefaultConnection");
 
     if (!string.IsNullOrEmpty(envConnection))
     {
         options.UseNpgsql(envConnection);
-        Console.WriteLine("CONECTADO A: RENDER (Nube)");
+        [cite_start] Console.WriteLine("CONECTADO A: RENDER (Nube) [cite: 7]");
     }
     else
     {
-        // 2. Si no hay nube, buscamos en el appsettings.json
+        [cite_start]// 2. Si no hay nube, buscamos en el appsettings.json 
         var localConnection = builder.Configuration.GetConnectionString("APIVotosDbContext.postgresql");
 
-        // Si la primera opción local es nula, probamos con la segunda
         if (string.IsNullOrEmpty(localConnection))
         {
             localConnection = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -34,15 +34,16 @@ builder.Services.AddDbContext<APIVotosDbContext>(options =>
 
         if (string.IsNullOrEmpty(localConnection))
         {
-            throw new InvalidOperationException("No se encontró cadena de conexión ni en Render ni en Local");
+            [cite_start] throw new InvalidOperationException("No se encontró cadena de conexión ni en Render ni en Local [cite: 8]");
         }
 
         options.UseNpgsql(localConnection);
-        Console.WriteLine("CONECTADO A: LOCALHOST");
+        [cite_start] Console.WriteLine("CONECTADO A: LOCALHOST [cite: 9]");
     }
 });
 
 // ---------------- CONTROLLERS ----------------
+[cite_start]// Configuración para ignorar ciclos infinitos en las relaciones de los modelos 
 builder.Services.AddControllers()
     .AddNewtonsoftJson(options =>
         options.SerializerSettings.ReferenceLoopHandling = ReferenceLoopHandling.Ignore);
@@ -53,23 +54,38 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Activamos Swagger para pruebas en cualquier entorno
+[cite_start]// Activamos Swagger para pruebas en cualquier entorno 
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// ---------------- CREACIÓN AUTOMÁTICA DE TABLAS ----------------
+// ---------------- CREACIÓN AUTOMÁTICA DE TABLAS Y SEMILLA (SEED) ----------------
 using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     try
     {
         var context = services.GetRequiredService<APIVotosDbContext>();
+
+        [cite_start]// Asegura que las tablas existan según los modelos [cite: 13]
         context.Database.EnsureCreated();
-        Console.WriteLine("Base de datos lista.");
+        [cite_start] Console.WriteLine("Base de datos lista[cite: 14].");
+
+        // --- CARGA DE ROLES POR DEFECTO ---
+        // Esto verifica si la tabla de Roles está vacía para insertar los datos iniciales
+        if (!context.Roles.Any())
+        {
+            context.Roles.AddRange(
+                new Rol { Nombre = "Administrador" },
+                new Rol { Nombre = "Votante" },
+                new Rol { Nombre = "Candidato" }
+            );
+            context.SaveChanges();
+            Console.WriteLine("Roles iniciales cargados en la base de datos.");
+        }
     }
     catch (Exception ex)
     {
-        Console.WriteLine("Error en la BD: " + ex.Message);
+        [cite_start] Console.WriteLine("Error en la BD: " + ex.Message[cite: 15]);
     }
 }
 
