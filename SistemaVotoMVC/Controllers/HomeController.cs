@@ -6,15 +6,19 @@ namespace SistemaVotoMVC.Controllers
 {
     public class HomeController : Controller
     {
+        // Acción para la página de inicio (Landing Page)
         public IActionResult Index()
         {
             return View();
         }
 
+        // Acción para la página de privacidad
         public IActionResult Privacy()
         {
             return View();
         }
+
+        // Acción para la página de selección (¿Login o Registro?)
         public IActionResult Acceder()
         {
             return View();
