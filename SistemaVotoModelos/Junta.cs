@@ -11,10 +11,12 @@ namespace SistemaVotoModelos
         public int Id { get; set; }
         [Required]
         public int NumeroMesa { get; set; }
+
+        // Ubicación de la mesa
         public int DireccionId { get; set; }
         public Direccion? Direccion { get; set; }
 
-        // El Jefe de esta mesa (Votante con RolId 3)
-        public int JefeDeJuntaId { get; set; }
+        // Cédula del Jefe de Mesa (Votante con RolId 3)
+        public string JefeDeJuntaId { get; set; } = string.Empty;
     }
 }

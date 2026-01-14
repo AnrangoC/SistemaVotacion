@@ -9,6 +9,7 @@ namespace SistemaVotoModelos
         [Required]
         public string NombreCompleto { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+        public string Password { get; set; } = string.Empty; // Nueva propiedad para la contraseña si es que es admin o jefe de junta
         public string FotoUrl { get; set; } = string.Empty;
         public int RolId { get; set; } // 1: Admin, 2: Votante, 3: Jefe de Junta
         public bool Estado { get; set; } = true;
