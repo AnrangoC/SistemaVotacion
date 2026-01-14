@@ -10,9 +10,10 @@ namespace SistemaVotoModelos
         [Key]
         public int Id { get; set; }
         public DateTime FechaVoto { get; set; } = DateTime.UtcNow;
-        // Navegacion
-        public Eleccion? Eleccion { get; set; }
-        public Lista? Lista { get; set; }
-        public Candidato? Candidato { get; set; }
+        public int EleccionId { get; set; }
+        public int DireccionId { get; set; } // Para reportes por zona
+        public int NumeroMesa { get; set; }
+        public int? ListaId { get; set; }
+        public int? CandidatoId { get; set; }
     }
 }

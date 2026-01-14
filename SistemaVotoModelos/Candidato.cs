@@ -4,14 +4,10 @@ using System.ComponentModel.DataAnnotations;
 using System.Text;
 namespace SistemaVotoModelos
 {
-    public class Candidato
+    public class Candidato : Votante 
     {
-        [Key]
-        public int Id { get; set; }
-        public string Cargo { get; set; } = string.Empty;
-        // Navegacion: Un candidato "es" un votante
-        public Votante? DatosVotante { get; set; }
-        // Navegacion: El candidato pertenece a una lista
-        public Lista? Lista { get; set; }
+        
+        public int ListaId { get; set; }
+        public string RolPostulante { get; set; } = string.Empty; // Ej: Presidente
     }
 }

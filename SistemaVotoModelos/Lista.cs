@@ -9,10 +9,8 @@ namespace SistemaVotoModelos
     {
         [Key]
         public int Id { get; set; }
-        public string Nombre { get; set; } = string.Empty;
-        public string Siglas { get; set; } = string.Empty;
+        public string NombreLista { get; set; } = string.Empty;
         public string LogoUrl { get; set; } = string.Empty;
-        // Navegacion
-        public Eleccion? Eleccion { get; set; }
+        public int EleccionId { get; set; }
     }
 }
