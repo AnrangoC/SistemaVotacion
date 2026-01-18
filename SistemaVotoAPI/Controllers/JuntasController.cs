@@ -5,54 +5,54 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using SistemaVotoModelos;
 using SistemaVotoAPI.Data;
+using SistemaVotoModelos;
 
 namespace SistemaVotoAPI.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    public class ListasController : ControllerBase
+    public class JuntasController : ControllerBase
     {
         private readonly APIVotosDbContext _context;
 
-        public ListasController(APIVotosDbContext context)
+        public JuntasController(APIVotosDbContext context)
         {
             _context = context;
         }
 
-        // GET: api/Listas
+        // GET: api/Juntas
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Lista>>> GetLista()
+        public async Task<ActionResult<IEnumerable<Junta>>> GetJuntas()
         {
-            return await _context.Listas.ToListAsync();
+            return await _context.Juntas.ToListAsync();
         }
 
-        // GET: api/Listas/5
+        // GET: api/Juntas/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Lista>> GetLista(int id)
+        public async Task<ActionResult<Junta>> GetJunta(int id)
         {
-            var lista = await _context.Listas.FindAsync(id);
+            var junta = await _context.Juntas.FindAsync(id);
 
-            if (lista == null)
+            if (junta == null)
             {
                 return NotFound();
             }
 
-            return lista;
+            return junta;
         }
 
-        // PUT: api/Listas/5
+        // PUT: api/Juntas/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutLista(int id, Lista lista)
+        public async Task<IActionResult> PutJunta(int id, Junta junta)
         {
-            if (id != lista.Id)
+            if (id != junta.Id)
             {
                 return BadRequest();
             }
 
-            _context.Entry(lista).State = EntityState.Modified;
+            _context.Entry(junta).State = EntityState.Modified;
 
             try
             {
@@ -60,7 +60,7 @@ namespace SistemaVotoAPI.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!ListaExists(id))
+                if (!JuntaExists(id))
                 {
                     return NotFound();
                 }
@@ -73,36 +73,36 @@ namespace SistemaVotoAPI.Controllers
             return NoContent();
         }
 
-        // POST: api/Listas
+        // POST: api/Juntas
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Lista>> PostLista(Lista lista)
+        public async Task<ActionResult<Junta>> PostJunta(Junta junta)
         {
-            _context.Listas.Add(lista);
+            _context.Juntas.Add(junta);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetLista", new { id = lista.Id }, lista);
+            return CreatedAtAction("GetJunta", new { id = junta.Id }, junta);
         }
 
-        // DELETE: api/Listas/5
+        // DELETE: api/Juntas/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteLista(int id)
+        public async Task<IActionResult> DeleteJunta(int id)
         {
-            var lista = await _context.Listas.FindAsync(id);
-            if (lista == null)
+            var junta = await _context.Juntas.FindAsync(id);
+            if (junta == null)
             {
                 return NotFound();
             }
 
-            _context.Listas.Remove(lista);
+            _context.Juntas.Remove(junta);
             await _context.SaveChangesAsync();
 
             return NoContent();
         }
 
-        private bool ListaExists(int id)
+        private bool JuntaExists(int id)
         {
-            return _context.Listas.Any(e => e.Id == id);
+            return _context.Juntas.Any(e => e.Id == id);
         }
     }
 }

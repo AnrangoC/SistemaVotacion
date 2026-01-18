@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoModelos;
+using SistemaVotoAPI.Data;
 
 namespace SistemaVotoAPI.Controllers
 {

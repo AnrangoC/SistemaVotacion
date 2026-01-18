@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SistemaVotoAPI.Data;
 using SistemaVotoModelos;
 
 namespace SistemaVotoAPI.Controllers
@@ -20,18 +20,18 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // GET: api/Candidatoes
+        // GET: api/Candidatos
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Candidato>>> GetCandidato()
         {
             return await _context.Candidatos.ToListAsync();
         }
 
-        // GET: api/Candidatoes/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Candidato>> GetCandidato(int id)
+        // GET: api/Candidatos/0102030405
+        [HttpGet("{cedula}")]
+        public async Task<ActionResult<Candidato>> GetCandidato(string cedula)
         {
-            var candidato = await _context.Candidatos.FindAsync(id);
+            var candidato = await _context.Candidatos.FindAsync(cedula);
 
             if (candidato == null)
             {
@@ -41,12 +41,12 @@ namespace SistemaVotoAPI.Controllers
             return candidato;
         }
 
-        // PUT: api/Candidatoes/5
+        // PUT: api/Candidatos/0102030405
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutCandidato(int id, Candidato candidato)
+        [HttpPut("{cedula}")]
+        public async Task<IActionResult> PutCandidato(string cedula, Candidato candidato)
         {
-            if (id != candidato.Id)
+            if (cedula != candidato.Cedula)
             {
                 return BadRequest();
             }
@@ -59,7 +59,7 @@ namespace SistemaVotoAPI.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!CandidatoExists(id))
+                if (!CandidatoExists(cedula))
                 {
                     return NotFound();
                 }
@@ -72,22 +72,29 @@ namespace SistemaVotoAPI.Controllers
             return NoContent();
         }
 
-        // POST: api/Candidatoes
+        // POST: api/Candidatos
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         public async Task<ActionResult<Candidato>> PostCandidato(Candidato candidato)
         {
+            if (await _context.Candidatos.AnyAsync(c => c.Cedula == candidato.Cedula))
+                return Conflict("Ya existe un candidato con esa cédula.");
+
             _context.Candidatos.Add(candidato);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetCandidato", new { id = candidato.Id }, candidato);
+            return CreatedAtAction(
+                nameof(GetCandidato),
+                new { cedula = candidato.Cedula },
+                candidato
+            );
         }
 
-        // DELETE: api/Candidatoes/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteCandidato(int id)
+        // DELETE: api/Candidatos/0102030405
+        [HttpDelete("{cedula}")]
+        public async Task<IActionResult> DeleteCandidato(string cedula)
         {
-            var candidato = await _context.Candidatos.FindAsync(id);
+            var candidato = await _context.Candidatos.FindAsync(cedula);
             if (candidato == null)
             {
                 return NotFound();
@@ -99,9 +106,9 @@ namespace SistemaVotoAPI.Controllers
             return NoContent();
         }
 
-        private bool CandidatoExists(int id)
+        private bool CandidatoExists(string cedula)
         {
-            return _context.Candidatos.Any(e => e.Id == id);
+            return _context.Candidatos.Any(e => e.Cedula == cedula);
         }
     }
 }
