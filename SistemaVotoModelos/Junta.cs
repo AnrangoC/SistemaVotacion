@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Text;
 
 namespace SistemaVotoModelos
 {
@@ -11,12 +9,12 @@ namespace SistemaVotoModelos
         public int Id { get; set; }
         [Required]
         public int NumeroMesa { get; set; }
-
-        // Ubicación de la mesa
         public int DireccionId { get; set; }
         public Direccion? Direccion { get; set; }
-
-        // Cédula del Jefe de Mesa (Votante con RolId 3)
+        [Required]
         public string JefeDeJuntaId { get; set; } = string.Empty;
+        public Votante? JefeDeJunta { get; set; }
+        // Relación: una junta tiene muchos votantes
+        public ICollection<Votante> Votantes { get; set; } = new List<Votante>();
     }
 }

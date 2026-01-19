@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Text;
 
 namespace SistemaVotoModelos
 {
@@ -12,8 +10,11 @@ namespace SistemaVotoModelos
         [Required]
         [StringLength(6)]
         public string Codigo { get; set; } = string.Empty;
-        public string VotanteId { get; set; } = string.Empty; // Cédula vinculada
+        // FK hacia Votante
+        public string VotanteId { get; set; } = string.Empty;
         public bool EsValido { get; set; } = true;
         public DateTime FechaCreacion { get; set; } = DateTime.UtcNow;
+
+        public Votante? Votante { get; set; }
     }
 }

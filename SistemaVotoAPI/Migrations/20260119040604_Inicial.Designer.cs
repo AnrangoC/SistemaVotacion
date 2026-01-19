@@ -12,20 +12,20 @@ using SistemaVotoAPI.Data;
 namespace SistemaVotoAPI.Migrations
 {
     [DbContext(typeof(APIVotosDbContext))]
-    [Migration("20260107021842_MigracionBeta")]
-    partial class MigracionBeta
+    [Migration("20260119040604_Inicial")]
+    partial class Inicial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.1")
+                .HasAnnotation("ProductVersion", "10.0.2")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("SistemaVotoModelos.Candidato", b =>
+            modelBuilder.Entity("SistemaVotoModelos.Direccion", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -33,23 +33,21 @@ namespace SistemaVotoAPI.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Cargo")
+                    b.Property<string>("Canton")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int?>("DatosVotanteId")
-                        .HasColumnType("integer");
+                    b.Property<string>("Parroquia")
+                        .IsRequired()
+                        .HasColumnType("text");
 
-                    b.Property<int?>("ListaId")
-                        .HasColumnType("integer");
+                    b.Property<string>("Provincia")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DatosVotanteId");
-
-                    b.HasIndex("ListaId");
-
-                    b.ToTable("Candidatos");
+                    b.ToTable("Direcciones");
                 });
 
             modelBuilder.Entity("SistemaVotoModelos.Eleccion", b =>
@@ -70,10 +68,6 @@ namespace SistemaVotoAPI.Migrations
                     b.Property<DateTime>("FechaInicio")
                         .HasColumnType("timestamp without time zone");
 
-                    b.Property<string>("TipoEleccion")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("Titulo")
                         .IsRequired()
                         .HasColumnType("text");
@@ -83,7 +77,7 @@ namespace SistemaVotoAPI.Migrations
                     b.ToTable("Elecciones");
                 });
 
-            modelBuilder.Entity("SistemaVotoModelos.HistorialParticipacion", b =>
+            modelBuilder.Entity("SistemaVotoModelos.Junta", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -91,22 +85,23 @@ namespace SistemaVotoAPI.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("EleccionId")
+                    b.Property<int>("DireccionId")
                         .HasColumnType("integer");
 
-                    b.Property<DateTime>("FechaVoto")
-                        .HasColumnType("timestamp without time zone");
+                    b.Property<string>("JefeDeJuntaId")
+                        .IsRequired()
+                        .HasColumnType("character varying(10)");
 
-                    b.Property<int?>("VotanteId")
+                    b.Property<int>("NumeroMesa")
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EleccionId");
+                    b.HasIndex("DireccionId");
 
-                    b.HasIndex("VotanteId");
+                    b.HasIndex("JefeDeJuntaId");
 
-                    b.ToTable("HistorialParticipaciones");
+                    b.ToTable("Juntas");
                 });
 
             modelBuilder.Entity("SistemaVotoModelos.Lista", b =>
@@ -117,35 +112,62 @@ namespace SistemaVotoAPI.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("EleccionId")
+                    b.Property<int>("EleccionId")
                         .HasColumnType("integer");
 
                     b.Property<string>("LogoUrl")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Nombre")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Siglas")
+                    b.Property<string>("NombreLista")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EleccionId");
-
                     b.ToTable("Listas");
                 });
 
-            modelBuilder.Entity("SistemaVotoModelos.Votante", b =>
+            modelBuilder.Entity("SistemaVotoModelos.TokenAcceso", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Codigo")
+                        .IsRequired()
+                        .HasMaxLength(6)
+                        .HasColumnType("character varying(6)");
+
+                    b.Property<bool>("EsValido")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("FechaCreacion")
+                        .HasColumnType("timestamp without time zone");
+
+                    b.Property<string>("VotanteId")
+                        .IsRequired()
+                        .HasColumnType("character varying(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VotanteId");
+
+                    b.ToTable("TokensAcceso");
+                });
+
+            modelBuilder.Entity("SistemaVotoModelos.Votante", b =>
+                {
+                    b.Property<string>("Cedula")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<string>("Discriminator")
+                        .IsRequired()
+                        .HasMaxLength(13)
+                        .HasColumnType("character varying(13)");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -158,20 +180,32 @@ namespace SistemaVotoAPI.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<bool>("HaVotado")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("JuntaId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("NombreCompleto")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("PasswordHash")
+                    b.Property<string>("Password")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<int>("RolId")
                         .HasColumnType("integer");
 
-                    b.HasKey("Id");
+                    b.HasKey("Cedula");
+
+                    b.HasIndex("JuntaId");
 
                     b.ToTable("Votantes");
+
+                    b.HasDiscriminator<string>("Discriminator").HasValue("Votante");
+
+                    b.UseTphMappingStrategy();
                 });
 
             modelBuilder.Entity("SistemaVotoModelos.VotoAnonimo", b =>
@@ -185,7 +219,10 @@ namespace SistemaVotoAPI.Migrations
                     b.Property<int?>("CandidatoId")
                         .HasColumnType("integer");
 
-                    b.Property<int?>("EleccionId")
+                    b.Property<int>("DireccionId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("EleccionId")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("FechaVoto")
@@ -194,75 +231,84 @@ namespace SistemaVotoAPI.Migrations
                     b.Property<int?>("ListaId")
                         .HasColumnType("integer");
 
+                    b.Property<int>("NumeroMesa")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
-
-                    b.HasIndex("CandidatoId");
-
-                    b.HasIndex("EleccionId");
-
-                    b.HasIndex("ListaId");
 
                     b.ToTable("VotosAnonimos");
                 });
 
             modelBuilder.Entity("SistemaVotoModelos.Candidato", b =>
                 {
-                    b.HasOne("SistemaVotoModelos.Votante", "DatosVotante")
-                        .WithMany()
-                        .HasForeignKey("DatosVotanteId");
+                    b.HasBaseType("SistemaVotoModelos.Votante");
 
-                    b.HasOne("SistemaVotoModelos.Lista", "Lista")
-                        .WithMany()
-                        .HasForeignKey("ListaId");
+                    b.Property<int>("ListaId")
+                        .HasColumnType("integer");
 
-                    b.Navigation("DatosVotante");
+                    b.Property<string>("RolPostulante")
+                        .IsRequired()
+                        .HasColumnType("text");
 
-                    b.Navigation("Lista");
+                    b.HasIndex("ListaId");
+
+                    b.HasDiscriminator().HasValue("Candidato");
                 });
 
-            modelBuilder.Entity("SistemaVotoModelos.HistorialParticipacion", b =>
+            modelBuilder.Entity("SistemaVotoModelos.Junta", b =>
                 {
-                    b.HasOne("SistemaVotoModelos.Eleccion", "Eleccion")
+                    b.HasOne("SistemaVotoModelos.Direccion", "Direccion")
                         .WithMany()
-                        .HasForeignKey("EleccionId");
+                        .HasForeignKey("DireccionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
+                    b.HasOne("SistemaVotoModelos.Votante", "JefeDeJunta")
+                        .WithMany()
+                        .HasForeignKey("JefeDeJuntaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Direccion");
+
+                    b.Navigation("JefeDeJunta");
+                });
+
+            modelBuilder.Entity("SistemaVotoModelos.TokenAcceso", b =>
+                {
                     b.HasOne("SistemaVotoModelos.Votante", "Votante")
                         .WithMany()
-                        .HasForeignKey("VotanteId");
-
-                    b.Navigation("Eleccion");
+                        .HasForeignKey("VotanteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Votante");
                 });
 
-            modelBuilder.Entity("SistemaVotoModelos.Lista", b =>
+            modelBuilder.Entity("SistemaVotoModelos.Votante", b =>
                 {
-                    b.HasOne("SistemaVotoModelos.Eleccion", "Eleccion")
-                        .WithMany()
-                        .HasForeignKey("EleccionId");
+                    b.HasOne("SistemaVotoModelos.Junta", "Junta")
+                        .WithMany("Votantes")
+                        .HasForeignKey("JuntaId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("Eleccion");
+                    b.Navigation("Junta");
                 });
 
-            modelBuilder.Entity("SistemaVotoModelos.VotoAnonimo", b =>
+            modelBuilder.Entity("SistemaVotoModelos.Candidato", b =>
                 {
-                    b.HasOne("SistemaVotoModelos.Candidato", "Candidato")
-                        .WithMany()
-                        .HasForeignKey("CandidatoId");
-
-                    b.HasOne("SistemaVotoModelos.Eleccion", "Eleccion")
-                        .WithMany()
-                        .HasForeignKey("EleccionId");
-
                     b.HasOne("SistemaVotoModelos.Lista", "Lista")
                         .WithMany()
-                        .HasForeignKey("ListaId");
-
-                    b.Navigation("Candidato");
-
-                    b.Navigation("Eleccion");
+                        .HasForeignKey("ListaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Lista");
+                });
+
+            modelBuilder.Entity("SistemaVotoModelos.Junta", b =>
+                {
+                    b.Navigation("Votantes");
                 });
 #pragma warning restore 612, 618
         }

@@ -15,10 +15,7 @@
                     <form asp-controller="Cuentas" asp-action="Registro" method="post">
 
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Número de Cédula</label>
-                                <input asp-for="Id" type="text" class="form-control" placeholder="Ej: 1723456789" required />
-                            </div>
+                            
                             <div class="col-md-6 mb-3">
                                 <label class="form-label fw-bold">Nombre Completo</label>
                                 <input asp-for="NombreCompleto" type="text" class="form-control" placeholder="Nombres y Apellidos" required />
@@ -30,10 +27,7 @@
                                 <label class="form-label fw-bold">Correo Electrónico</label>
                                 <input asp-for="Email" type="email" class="form-control" placeholder="usuario@sistema.com" required />
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label fw-bold">Contraseña Temporal</label>
-                                <input asp-for="PasswordHash" type="password" class="form-control" required />
-                            </div>
+                           
                         </div>
 
 @*                         <div class="row">

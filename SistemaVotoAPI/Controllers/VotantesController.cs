@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
 using SistemaVotoModelos;
+using SistemaVotoAPI.Security;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -54,6 +55,39 @@ namespace SistemaVotoAPI.Controllers
             if (await _context.Votantes.AnyAsync(v => v.Cedula == votante.Cedula))
                 return Conflict("Ya existe un votante con esa cédula.");
 
+            /*
+             Lógica de negocio:
+             Validación de roles permitidos en el sistema
+            */
+            if (votante.RolId < 1 || votante.RolId > 3)
+                return BadRequest("Rol inválido.");
+
+            /*
+             Lógica de negocio:
+             Un candidato no puede ser creado como administrador ni jefe de junta
+            */
+            if (votante.RolId == 1 || votante.RolId == 3)
+            {
+                bool existeComoCandidato = await _context.Candidatos
+                    .AnyAsync(c => c.Cedula == votante.Cedula);
+
+                if (existeComoCandidato)
+                    return Conflict("Un candidato no puede ser administrador ni jefe de junta.");
+            }
+
+            /*
+             Lógica de seguridad:
+             La contraseña se almacena siempre como hash
+            */
+            votante.Password = PasswordHasher.Hash(votante.Password);
+
+            /*
+             Lógica de estado inicial:
+             Todo votante se registra activo y sin haber votado
+            */
+            votante.Estado = true;
+            votante.HaVotado = false;
+
             _context.Votantes.Add(votante);
             await _context.SaveChangesAsync();
 
@@ -67,7 +101,40 @@ namespace SistemaVotoAPI.Controllers
             if (cedula != votante.Cedula)
                 return BadRequest();
 
-            _context.Entry(votante).State = EntityState.Modified;
+            var existente = await _context.Votantes.FindAsync(cedula);
+            if (existente == null)
+                return NotFound();
+
+            /*
+             Lógica de negocio:
+             No se permite asignar rol de administrador o jefe de junta
+             a una persona que ya es candidata
+            */
+            if (votante.RolId != existente.RolId &&
+                (votante.RolId == 1 || votante.RolId == 3))
+            {
+                bool esCandidato = await _context.Candidatos
+                    .AnyAsync(c => c.Cedula == cedula);
+
+                if (esCandidato)
+                    return Conflict("Un candidato no puede ser administrador ni jefe de junta.");
+            }
+
+            existente.NombreCompleto = votante.NombreCompleto;
+            existente.Email = votante.Email;
+            existente.FotoUrl = votante.FotoUrl;
+            existente.RolId = votante.RolId;
+            existente.Estado = votante.Estado;
+            existente.JuntaId = votante.JuntaId;
+
+            /*
+             Lógica de seguridad:
+             Solo se vuelve a hashear la contraseña si se envía una nueva
+            */
+            if (!string.IsNullOrWhiteSpace(votante.Password))
+            {
+                existente.Password = PasswordHasher.Hash(votante.Password);
+            }
 
             await _context.SaveChangesAsync();
             return NoContent();
