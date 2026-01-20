@@ -1,13 +1,16 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using SistemaVotoMVC.Models;
-using System.Net.Http;
-using System.Threading.Tasks;
+using SistemaVotoMVC.DTOs;
 using System.Net.Http.Json;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using System.Security.Claims;
 
 namespace SistemaVotoMVC.Controllers
 {
     public class AutController : Controller
     {
+        // Solo debe existir UNA declaración de esta variable
         private readonly IHttpClientFactory _httpClientFactory;
 
         public AutController(IHttpClientFactory httpClientFactory)
@@ -15,44 +18,63 @@ namespace SistemaVotoMVC.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
-        // GET: /Aut/Login
+        [HttpGet]
         public IActionResult Login()
         {
             return View();
         }
 
-        // POST: /Aut/Login
         [HttpPost]
-        public async Task<IActionResult> Login(LoginViewModel model)
+        [ActionName("Login")]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LoginPost(LoginViewModel model)
         {
-            if (!ModelState.IsValid)
-                return View(model);
+            if (!ModelState.IsValid) return View(model);
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
-            var response = await client.PostAsync(
-                $"api/Aut/LoginGestion?cedula={model.Cedula}&password={model.Password}",
-                null
-            );
+            // Se envía el objeto a la API como JSON
+            var response = await client.PostAsJsonAsync("api/Aut/LoginGestion", new
+            {
+                Cedula = model.Cedula,
+                Password = model.Password
+            });
 
             if (!response.IsSuccessStatusCode)
             {
-                ModelState.AddModelError("", "Credenciales incorrectas");
+                ModelState.AddModelError(string.Empty, "Credenciales incorrectas.");
                 return View(model);
             }
 
-            var usuario = await response.Content.ReadFromJsonAsync<dynamic>();
+            var usuario = await response.Content.ReadFromJsonAsync<LoginResponseDto>();
+            if (usuario == null) return View(model);
 
-            // Por ahora solo redirigimos según rol
-            int rol = usuario.rolId;
+            // Configuración de la sesión (Cookies)
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, usuario.NombreCompleto),
+                new Claim(ClaimTypes.NameIdentifier, usuario.Cedula),
+                new Claim(ClaimTypes.Role, usuario.RolId.ToString())
+            };
 
-            if (rol == 1)
-                return RedirectToAction("Index", "Admin");
+            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
-            if (rol == 3)
-                return RedirectToAction("Index", "JefeJunta");
+            await HttpContext.SignInAsync(
+                CookieAuthenticationDefaults.AuthenticationScheme,
+                new ClaimsPrincipal(claimsIdentity));
+
+            // Redirección por Rol
+            if (usuario.RolId == 1) return RedirectToAction("Index", "Admin");
+            if (usuario.RolId == 3) return RedirectToAction("Index", "JefeJunta");
 
             return RedirectToAction("Index", "Home");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Logout()
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction("Login");
         }
     }
 }

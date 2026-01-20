@@ -1,11 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
-using SistemaVotoAPI.Security;
 using SistemaVotoAPI.DTOs;
-using SistemaVotoModelos;
-using System;
-using System.Linq;
+using SistemaVotoAPI.Security; // Donde se encuentra tu PasswordHasher
 using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Controllers
@@ -21,129 +18,65 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // LOGIN PARA ADMIN (1) Y JEFE DE JUNTA (3)
         // POST: api/Aut/LoginGestion
         [HttpPost("LoginGestion")]
         public async Task<IActionResult> LoginGestion([FromBody] LoginRequestDto request)
         {
+            if (request == null || string.IsNullOrEmpty(request.Cedula) || string.IsNullOrEmpty(request.Password))
+            {
+                return BadRequest("Datos de inicio de sesión incompletos.");
+            }
+
+            // 1. Buscar al usuario por cédula. 
+            // Filtramos para que solo entren Roles 1 (Admin) o 3 (Jefe de Junta) y que estén activos (Estado == true)
             var usuario = await _context.Votantes
-                .FirstOrDefaultAsync(v =>
-                    v.Cedula == request.Cedula &&
-                    (v.RolId == 1 || v.RolId == 3) &&
-                    v.Estado == true);
+                .FirstOrDefaultAsync(v => v.Cedula == request.Cedula && v.Estado == true);
 
             if (usuario == null)
-                return Unauthorized("Credenciales incorrectas");
+            {
+                return Unauthorized("Usuario no encontrado o inactivo.");
+            }
 
-            bool passwordValido = PasswordHasher.Verify(request.Password, usuario.Password);
-            if (!passwordValido)
-                return Unauthorized("Credenciales incorrectas");
+            // 2. Verificar si tiene el Rol permitido para la gestión
+            if (usuario.RolId != 1 && usuario.RolId != 3)
+            {
+                return Unauthorized("El usuario no tiene permisos de gestión.");
+            }
 
-            return Ok(new LoginResponseDto
+            // 3. Verificar la contraseña usando tu clase de seguridad
+            bool isPasswordValid = PasswordHasher.Verify(request.Password, usuario.Password);
+
+            if (!isPasswordValid)
+            {
+                return Unauthorized("Cédula o contraseña incorrecta.");
+            }
+
+            // 4. Responder con los datos necesarios para que el MVC cree la sesión/cookie
+            var response = new LoginResponseDto
             {
                 Cedula = usuario.Cedula,
                 NombreCompleto = usuario.NombreCompleto,
                 Email = usuario.Email,
                 RolId = usuario.RolId,
                 JuntaId = usuario.JuntaId
-            });
-        }
-
-
-
-        // GENERAR TOKEN PARA VOTANTE
-        // POST: api/Aut/GenerarToken
-        [HttpPost("GenerarToken")]
-        public async Task<IActionResult> GenerarToken(string cedulaJefe, string cedulaVotante)
-        {
-            var jefe = await _context.Votantes.FindAsync(cedulaJefe);
-            if (jefe == null || jefe.RolId != 3)
-                return Unauthorized("Solo el jefe de junta puede generar tokens");
-
-            var votante = await _context.Votantes.FindAsync(cedulaVotante);
-            if (votante == null)
-                return NotFound("Votante no existe");
-
-            if (jefe.JuntaId != votante.JuntaId)
-                return Unauthorized("El votante no pertenece a su junta");
-
-            if (votante.RolId != 2)
-                return BadRequest("Solo votantes pueden recibir token");
-
-            if (votante.HaVotado)
-                return Conflict("El votante ya sufragó");
-
-            var tokensPrevios = await _context.TokensAcceso
-                .Where(t => t.VotanteId == votante.Cedula && t.EsValido)
-                .ToListAsync();
-
-            foreach (var t in tokensPrevios)
-                t.EsValido = false;
-
-            var token = new TokenAcceso
-            {
-                Codigo = new Random().Next(100000, 999999).ToString(),
-                VotanteId = votante.Cedula,
-                EsValido = true,
-                FechaCreacion = DateTime.Now
             };
 
-            /*
-            // TOKEN ALFANUMÉRICO (opcional)
-            var token = new TokenAcceso
-            {
-                Codigo = GenerarTokenAlfanumerico(6),
-                VotanteId = votante.Cedula,
-                EsValido = true,
-                FechaCreacion = DateTime.Now
-            };
-            */
-
-            _context.TokensAcceso.Add(token);
-            await _context.SaveChangesAsync();
-
-            return Ok(new
-            {
-                votante.Cedula,
-                token.Codigo
-            });
+            return Ok(response);
         }
 
-        // VALIDAR TOKEN EN LA URNA
-        // POST: api/Aut/ValidarToken
-        [HttpPost("ValidarToken")]
-        public async Task<IActionResult> ValidarToken(string cedula, string codigo)
+        // Si necesitas un método para votantes normales (Opcional)
+        [HttpPost("LoginVotante")]
+        public async Task<IActionResult> LoginVotante([FromBody] LoginRequestDto request)
         {
-            var token = await _context.TokensAcceso
-                .FirstOrDefaultAsync(t =>
-                    t.VotanteId == cedula &&
-                    t.Codigo == codigo &&
-                    t.EsValido);
+            var usuario = await _context.Votantes
+                .FirstOrDefaultAsync(v => v.Cedula == request.Cedula && v.RolId == 2 && v.Estado == true);
 
-            if (token == null)
-                return Unauthorized("Token inválido o usado");
+            if (usuario == null || !PasswordHasher.Verify(request.Password, usuario.Password))
+            {
+                return Unauthorized("Credenciales inválidas para votante.");
+            }
 
-            var votante = await _context.Votantes.FindAsync(cedula);
-            if (votante == null || votante.HaVotado)
-                return Unauthorized("Acceso no permitido");
-
-            token.EsValido = false;
-            await _context.SaveChangesAsync();
-
-            return Ok("Acceso concedido");
+            return Ok(new { usuario.Cedula, usuario.NombreCompleto, usuario.RolId });
         }
-
-        /*
-        private string GenerarTokenAlfanumerico(int longitud)
-        {
-            const string caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-            var random = new Random();
-            return new string(
-                Enumerable.Repeat(caracteres, longitud)
-                          .Select(s => s[random.Next(s.Length)])
-                          .ToArray()
-            );
-        }
-        */
     }
 }

@@ -7,7 +7,7 @@ public class CuentasController : Controller
 {
     private readonly IHttpClientFactory _httpClientFactory;
 
-    public CuentasController(IHttpClientFactory httpClientFactory)
+    public CuentasController(IHttpClientFactory httpClientFactory)  
     {
         _httpClientFactory = httpClientFactory;
     }
