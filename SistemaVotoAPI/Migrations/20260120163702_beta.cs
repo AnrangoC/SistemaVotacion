@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace SistemaVotoAPI.Migrations
 {
     /// <inheritdoc />
-    public partial class Inicial : Migration
+    public partial class beta : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -56,6 +56,12 @@ namespace SistemaVotoAPI.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Listas", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Listas_Elecciones_EleccionId",
+                        column: x => x.EleccionId,
+                        principalTable: "Elecciones",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -68,12 +74,19 @@ namespace SistemaVotoAPI.Migrations
                     EleccionId = table.Column<int>(type: "integer", nullable: false),
                     DireccionId = table.Column<int>(type: "integer", nullable: false),
                     NumeroMesa = table.Column<int>(type: "integer", nullable: false),
-                    ListaId = table.Column<int>(type: "integer", nullable: true),
-                    CandidatoId = table.Column<int>(type: "integer", nullable: true)
+                    ListaId = table.Column<int>(type: "integer", nullable: false),
+                    CedulaCandidato = table.Column<string>(type: "text", nullable: false),
+                    RolPostulante = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_VotosAnonimos", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_VotosAnonimos_Elecciones_EleccionId",
+                        column: x => x.EleccionId,
+                        principalTable: "Elecciones",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -84,7 +97,8 @@ namespace SistemaVotoAPI.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     NumeroMesa = table.Column<int>(type: "integer", nullable: false),
                     DireccionId = table.Column<int>(type: "integer", nullable: false),
-                    JefeDeJuntaId = table.Column<string>(type: "character varying(10)", nullable: false)
+                    JefeDeJuntaId = table.Column<string>(type: "character varying(10)", nullable: false),
+                    Estado = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -164,6 +178,11 @@ namespace SistemaVotoAPI.Migrations
                 column: "JefeDeJuntaId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Listas_EleccionId",
+                table: "Listas",
+                column: "EleccionId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_TokensAcceso_VotanteId",
                 table: "TokensAcceso",
                 column: "VotanteId");
@@ -177,6 +196,11 @@ namespace SistemaVotoAPI.Migrations
                 name: "IX_Votantes_ListaId",
                 table: "Votantes",
                 column: "ListaId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_VotosAnonimos_EleccionId",
+                table: "VotosAnonimos",
+                column: "EleccionId");
 
             migrationBuilder.AddForeignKey(
                 name: "FK_Juntas_Votantes_JefeDeJuntaId",
@@ -199,9 +223,6 @@ namespace SistemaVotoAPI.Migrations
                 table: "Juntas");
 
             migrationBuilder.DropTable(
-                name: "Elecciones");
-
-            migrationBuilder.DropTable(
                 name: "TokensAcceso");
 
             migrationBuilder.DropTable(
@@ -218,6 +239,9 @@ namespace SistemaVotoAPI.Migrations
 
             migrationBuilder.DropTable(
                 name: "Listas");
+
+            migrationBuilder.DropTable(
+                name: "Elecciones");
         }
     }
 }

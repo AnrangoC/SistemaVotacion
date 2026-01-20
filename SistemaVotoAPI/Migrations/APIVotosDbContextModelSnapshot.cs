@@ -85,6 +85,9 @@ namespace SistemaVotoAPI.Migrations
                     b.Property<int>("DireccionId")
                         .HasColumnType("integer");
 
+                    b.Property<int>("Estado")
+                        .HasColumnType("integer");
+
                     b.Property<string>("JefeDeJuntaId")
                         .IsRequired()
                         .HasColumnType("character varying(10)");
@@ -121,6 +124,8 @@ namespace SistemaVotoAPI.Migrations
                         .HasColumnType("text");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("EleccionId");
 
                     b.ToTable("Listas");
                 });
@@ -200,7 +205,7 @@ namespace SistemaVotoAPI.Migrations
 
                     b.ToTable("Votantes");
 
-                    b.HasDiscriminator<string>("Discriminator").HasValue("Votante");
+                    b.HasDiscriminator<string>("Discriminator").HasValue("VOTANTE");
 
                     b.UseTphMappingStrategy();
                 });
@@ -213,8 +218,9 @@ namespace SistemaVotoAPI.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("CandidatoId")
-                        .HasColumnType("integer");
+                    b.Property<string>("CedulaCandidato")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int>("DireccionId")
                         .HasColumnType("integer");
@@ -225,13 +231,19 @@ namespace SistemaVotoAPI.Migrations
                     b.Property<DateTime>("FechaVoto")
                         .HasColumnType("timestamp without time zone");
 
-                    b.Property<int?>("ListaId")
+                    b.Property<int>("ListaId")
                         .HasColumnType("integer");
 
                     b.Property<int>("NumeroMesa")
                         .HasColumnType("integer");
 
+                    b.Property<string>("RolPostulante")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("EleccionId");
 
                     b.ToTable("VotosAnonimos");
                 });
@@ -249,7 +261,7 @@ namespace SistemaVotoAPI.Migrations
 
                     b.HasIndex("ListaId");
 
-                    b.HasDiscriminator().HasValue("Candidato");
+                    b.HasDiscriminator().HasValue("CANDIDATO");
                 });
 
             modelBuilder.Entity("SistemaVotoModelos.Junta", b =>
@@ -271,6 +283,15 @@ namespace SistemaVotoAPI.Migrations
                     b.Navigation("JefeDeJunta");
                 });
 
+            modelBuilder.Entity("SistemaVotoModelos.Lista", b =>
+                {
+                    b.HasOne("SistemaVotoModelos.Eleccion", null)
+                        .WithMany()
+                        .HasForeignKey("EleccionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SistemaVotoModelos.TokenAcceso", b =>
                 {
                     b.HasOne("SistemaVotoModelos.Votante", "Votante")
@@ -290,6 +311,15 @@ namespace SistemaVotoAPI.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Junta");
+                });
+
+            modelBuilder.Entity("SistemaVotoModelos.VotoAnonimo", b =>
+                {
+                    b.HasOne("SistemaVotoModelos.Eleccion", null)
+                        .WithMany()
+                        .HasForeignKey("EleccionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SistemaVotoModelos.Candidato", b =>

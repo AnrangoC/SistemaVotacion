@@ -1,0 +1,16 @@
+﻿@model SistemaVotoMVC.DTOs.LoginRequestDto
+
+<form asp-action="Ingreso" method="post">
+    <div class="mb-3">
+        <label>Cédula</label>
+        <input asp-for="Cedula" class="form-control" />
+    </div>
+
+    <div class="mb-3">
+        <label>Contraseña</label>
+        <input asp-for="Password" type="password" class="form-control" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Ingresar</button>
+</form>
+

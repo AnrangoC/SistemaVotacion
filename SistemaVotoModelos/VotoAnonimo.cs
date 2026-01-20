@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
-using System.Text;
 
 namespace SistemaVotoModelos
 {
@@ -10,10 +8,15 @@ namespace SistemaVotoModelos
         [Key]
         public int Id { get; set; }
         public DateTime FechaVoto { get; set; } = DateTime.UtcNow;
+        // Elección a la que pertenece el voto
         public int EleccionId { get; set; }
-        public int DireccionId { get; set; } // Para reportes por zona
+        // Ubicación para reportes
+        public int DireccionId { get; set; }
         public int NumeroMesa { get; set; }
-        public int? ListaId { get; set; }
-        public int? CandidatoId { get; set; }
+        // Información del voto
+        public int ListaId { get; set; }
+        // Información del candidato (DESCRIPTIVA, NO RELACIONAL)
+        public string CedulaCandidato { get; set; } = string.Empty;
+        public string RolPostulante { get; set; } = string.Empty;
     }
 }

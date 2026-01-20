@@ -1,31 +1,54 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using SistemaVotoModelos; 
-namespace SistemaVotoMVC.Controllers
+using SistemaVotoMVC.DTOs;
+using SistemaVotoMVC.Models;
+using System.Net.Http.Json;
+
+public class CuentasController : Controller
 {
-    public class CuentasController : Controller
+    private readonly IHttpClientFactory _httpClientFactory;
+
+    public CuentasController(IHttpClientFactory httpClientFactory)
     {
-        public IActionResult Ingreso()
-        {
-            return View();
-        }
+        _httpClientFactory = httpClientFactory;
+    }
 
-        public IActionResult Registro()
-        {
-            return View();
-        }
+    [HttpGet]
+    public IActionResult Ingreso()
+    {
+        return View();
+    }
 
-        [HttpPost]
-        public IActionResult Registro(Votante votante)
-        {
-            votante.RolId = 2; // Asumiendo que 2 es "Votante"
-            votante.Estado = true; // Activo por defecto
+    [HttpPost]
+    public async Task<IActionResult> Ingreso(LoginViewModel model)
+    {
+        if (!ModelState.IsValid)
+            return View(model);
 
-            if (ModelState.IsValid)
+        var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
+
+        var response = await client.PostAsJsonAsync(
+            "api/Aut/LoginGestion",
+            new
             {
-                // Aquí irá la conexión a tu API VotantesController
-                return RedirectToAction("Registro");
-            }
-            return View(votante);
+                cedula = model.Cedula,
+                password = model.Password
+            });
+
+        if (!response.IsSuccessStatusCode)
+        {
+            ModelState.AddModelError("", "Credenciales incorrectas");
+            return View(model);
         }
+
+        var usuario = await response.Content.ReadFromJsonAsync<LoginResponseDto>();
+
+        // Por ahora solo redirigimos según rol
+        if (usuario!.RolId == 1)
+            return RedirectToAction("Index", "Admin");
+
+        if (usuario.RolId == 3)
+            return RedirectToAction("Index", "Junta");
+
+        return RedirectToAction("Index", "Home");
     }
 }
