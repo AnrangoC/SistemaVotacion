@@ -34,10 +34,12 @@ namespace SistemaVotoAPI.Controllers
 
             if (usuario == null)
                 return Unauthorized("Credenciales incorrectas");
-            // Secompara la contraseña ingresada con el hash almacenado
+
+            // Se compara la contraseña ingresada con el hash almacenado
             bool passwordValido = PasswordHasher.Verify(password, usuario.Password);
             if (!passwordValido)
                 return Unauthorized("Credenciales incorrectas");
+
             // Se devuelve solo la información necesaria para el sistema
             return Ok(new
             {
@@ -46,9 +48,9 @@ namespace SistemaVotoAPI.Controllers
                 usuario.Email,
                 usuario.RolId,
                 usuario.JuntaId
-                
             });
         }
+
         // GENERAR TOKEN PARA VOTANTE
         // El jefe de junta valida al votante presencialmente y genera el token
         // POST: api/Aut/GenerarToken
@@ -64,15 +66,19 @@ namespace SistemaVotoAPI.Controllers
             var votante = await _context.Votantes.FindAsync(cedulaVotante);
             if (votante == null)
                 return NotFound("Votante no existe");
+
             // El jefe solo puede generar tokens para votantes de su misma junta
             if (jefe.JuntaId != votante.JuntaId)
                 return Unauthorized("El votante no pertenece a su junta");
+
             // Solo los votantes pueden recibir token
             if (votante.RolId != 2)
                 return BadRequest("Solo votantes pueden recibir token");
+
             // Si el votante ya sufragó, no puede recibir otro token
             if (votante.HaVotado)
                 return Conflict("El votante ya sufragó");
+
             // Se invalidan tokens anteriores en caso de existir
             var tokensPrevios = await _context.TokensAcceso
                 .Where(t => t.VotanteId == votante.Cedula && t.EsValido)
@@ -81,7 +87,8 @@ namespace SistemaVotoAPI.Controllers
             foreach (var t in tokensPrevios)
                 t.EsValido = false;
 
-            // Se genera un token de seis dígitos para el acceso a la urna
+            // GENERACIÓN DE TOKEN NUMÉRICO (ACTUAL)
+            // Token simple de seis dígitos, fácil de ingresar en votación presencial
             var token = new TokenAcceso
             {
                 Codigo = new Random().Next(100000, 999999).ToString(),
@@ -89,6 +96,21 @@ namespace SistemaVotoAPI.Controllers
                 EsValido = true,
                 FechaCreacion = DateTime.Now
             };
+
+            /*
+            // ALTERNATIVA COMENTADA: TOKEN ALFANUMÉRICO
+            // Se deja como referencia en caso de cambiar el formato del token en el futuro
+            // Más combinaciones, pero menos práctico para ingreso manual
+
+            var token = new TokenAcceso
+            {
+                Codigo = GenerarTokenAlfanumerico(6),
+                VotanteId = votante.Cedula,
+                EsValido = true,
+                FechaCreacion = DateTime.Now
+            };
+            */
+
             _context.TokensAcceso.Add(token);
             await _context.SaveChangesAsync();
 
@@ -114,15 +136,33 @@ namespace SistemaVotoAPI.Controllers
 
             if (token == null)
                 return Unauthorized("Token inválido o usado");
+
             // Se verifica que el votante aún no haya votado
             var votante = await _context.Votantes.FindAsync(cedula);
             if (votante == null || votante.HaVotado)
                 return Unauthorized("Acceso no permitido");
+
             // El token se invalida inmediatamente después de ser usado
             token.EsValido = false;
             await _context.SaveChangesAsync();
+
             // Aquí solo se permite el acceso a la votación, el voto se registra después
             return Ok("Acceso concedido");
         }
+
+        /*
+        // Por probar 
+        // Genera un token alfanumérico de longitud variable
+        private string GenerarTokenAlfanumerico(int longitud)
+        {
+            const string caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            var random = new Random();
+            return new string(
+                Enumerable.Repeat(caracteres, longitud)
+                          .Select(s => s[random.Next(s.Length)])
+                          .ToArray()
+            );
+        }
+        */
     }
 }

@@ -8,6 +8,6 @@ namespace SistemaVotoModelos
         public int ListaId { get; set; }
         public Lista? Lista { get; set; }
         [Required]
-        public string RolPostulante { get; set; } = string.Empty; // Ej: Presidente
+        public string RolPostulante { get; set; } = string.Empty; // Ej: Presidente, Alcalde y así
     }
 }

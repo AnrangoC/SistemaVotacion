@@ -25,14 +25,20 @@ namespace SistemaVotoAPI.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Junta>>> GetJuntas()
         {
-            return await _context.Juntas.ToListAsync();
+            return await _context.Juntas
+                .Include(j => j.Direccion)
+                .Include(j => j.JefeDeJunta)
+                .ToListAsync();
         }
 
         // GET: api/Juntas/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Junta>> GetJunta(int id)
         {
-            var junta = await _context.Juntas.FindAsync(id);
+            var junta = await _context.Juntas
+                .Include(j => j.Direccion)
+                .Include(j => j.JefeDeJunta)
+                .FirstOrDefaultAsync(j => j.Id == id);
 
             if (junta == null)
             {
@@ -44,6 +50,12 @@ namespace SistemaVotoAPI.Controllers
 
         // PUT: api/Juntas/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        //
+        // Este método NO debe usarse para editar:
+        // - Número de mesa
+        // - Dirección
+        //
+        // Solo se mantiene por el scaffold de Entity Framework.
         [HttpPut("{id}")]
         public async Task<IActionResult> PutJunta(int id, Junta junta)
         {
@@ -52,29 +64,51 @@ namespace SistemaVotoAPI.Controllers
                 return BadRequest();
             }
 
-            _context.Entry(junta).State = EntityState.Modified;
+            return BadRequest(
+                "No está permitido modificar número de mesa ni dirección de una junta"
+            );
+        }
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!JuntaExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+        // PUT: api/Juntas/AsignarJefe/5
+        //
+        // Asigna o cambia el jefe de junta
+        // El jefe debe existir previamente como votante
+        // Al asignarlo, su RolId se cambia automáticamente a 3
+        [HttpPut("AsignarJefe/{juntaId}")]
+        public async Task<IActionResult> AsignarJefeDeJunta(int juntaId, string cedulaVotante)
+        {
+            var junta = await _context.Juntas.FindAsync(juntaId);
+            if (junta == null)
+                return NotFound("Junta no encontrada");
 
-            return NoContent();
+            var votante = await _context.Votantes.FindAsync(cedulaVotante);
+            if (votante == null)
+                return NotFound("El votante no existe");
+
+            // El votante no puede ser administrador ni candidato
+            if (votante.RolId == 1)
+                return BadRequest("Un administrador no puede ser jefe de junta");
+
+            bool esCandidato = await _context.Candidatos
+                .AnyAsync(c => c.Cedula == cedulaVotante);
+
+            if (esCandidato)
+                return BadRequest("Un candidato no puede ser jefe de junta");
+
+            // Se asigna como jefe de junta
+            junta.JefeDeJuntaId = cedulaVotante;
+
+            // Se cambia el rol del votante a Jefe de Junta
+            votante.RolId = 3;
+
+            await _context.SaveChangesAsync();
+            return Ok("Jefe de junta asignado correctamente");
         }
 
         // POST: api/Juntas
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        //
+        // La junta se crea una sola vez
+        // Número de mesa y dirección quedan fijos
         [HttpPost]
         public async Task<ActionResult<Junta>> PostJunta(Junta junta)
         {
@@ -85,6 +119,9 @@ namespace SistemaVotoAPI.Controllers
         }
 
         // DELETE: api/Juntas/5
+        //
+        // Normalmente no se elimina una junta,
+        // se mantiene solo para control administrativo
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteJunta(int id)
         {

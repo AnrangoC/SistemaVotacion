@@ -2,11 +2,10 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using SistemaVotoModelos;
 using SistemaVotoAPI.Data;
+using SistemaVotoModelos;
 
 namespace SistemaVotoAPI.Controllers
 {
@@ -22,87 +21,55 @@ namespace SistemaVotoAPI.Controllers
         }
 
         // GET: api/VotosAnonimos
+        //
+        // Este endpoint es solo para uso administrativo y reportes
+        // NO debe usarse para exponer votos individualmente al público
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<VotoAnonimo>>> GetVotoAnonimo()
+        public async Task<ActionResult<IEnumerable<VotoAnonimo>>> GetVotosAnonimos()
         {
             return await _context.VotosAnonimos.ToListAsync();
         }
 
-        // GET: api/VotosAnonimos/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<VotoAnonimo>> GetVotoAnonimo(int id)
-        {
-            var votoAnonimo = await _context.VotosAnonimos.FindAsync(id);
-
-            if (votoAnonimo == null)
-            {
-                return NotFound();
-            }
-
-            return votoAnonimo;
-        }
-
-        // PUT: api/VotosAnonimos/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutVotoAnonimo(int id, VotoAnonimo votoAnonimo)
-        {
-            if (id != votoAnonimo.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(votoAnonimo).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!VotoAnonimoExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
         // POST: api/VotosAnonimos
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        //
+        // Registra un voto anónimo
+        // No se guarda información del votante
+        // El vínculo con el votante se rompe aquí
         [HttpPost]
         public async Task<ActionResult<VotoAnonimo>> PostVotoAnonimo(VotoAnonimo votoAnonimo)
         {
+            /*
+             Validaciones mínimas obligatorias:
+             - Elección válida
+             - Dirección válida
+             - Número de mesa válido
+            */
+
+            bool eleccionExiste = await _context.Elecciones
+                .AnyAsync(e => e.Id == votoAnonimo.EleccionId);
+
+            if (!eleccionExiste)
+                return BadRequest("Elección no válida");
+
+            votoAnonimo.FechaVoto = DateTime.UtcNow;
+
             _context.VotosAnonimos.Add(votoAnonimo);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetVotoAnonimo", new { id = votoAnonimo.Id }, votoAnonimo);
+            return Ok("Voto registrado correctamente");
         }
 
-        // DELETE: api/VotosAnonimos/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteVotoAnonimo(int id)
-        {
-            var votoAnonimo = await _context.VotosAnonimos.FindAsync(id);
-            if (votoAnonimo == null)
-            {
-                return NotFound();
-            }
+        /*
+         IMPORTANTE:
+         NO se implementan:
+         - PUT
+         - DELETE
+         - GET por ID
 
-            _context.VotosAnonimos.Remove(votoAnonimo);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
-        }
-
-        private bool VotoAnonimoExists(int id)
-        {
-            return _context.VotosAnonimos.Any(e => e.Id == id);
-        }
+         Un voto:
+         - No se edita
+         - No se elimina
+         - No se identifica individualmente
+        */
     }
 }

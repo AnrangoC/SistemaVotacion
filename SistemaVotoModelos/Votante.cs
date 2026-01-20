@@ -18,12 +18,12 @@ namespace SistemaVotoModelos
         [Required]
         public string Password { get; set; } = string.Empty;
         public string FotoUrl { get; set; } = string.Empty;
-        // 1: Admin, 2: Votante, 3: Jefe de Junta
+        // 1: Admin | 2: Votante | 3: Jefe de Junta
         [Range(1, 3)]
         public int RolId { get; set; }
         public bool Estado { get; set; } = true;
         public bool HaVotado { get; set; } = false;
-        // Relación con Junta (solo para votantes y jefes de junta)
+        // Relación con Junta (solo si pertenece a una)
         public int? JuntaId { get; set; }
         public Junta? Junta { get; set; }
     }

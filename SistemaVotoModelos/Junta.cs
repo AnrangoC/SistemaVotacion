@@ -14,6 +14,8 @@ namespace SistemaVotoModelos
         [Required]
         public string JefeDeJuntaId { get; set; } = string.Empty;
         public Votante? JefeDeJunta { get; set; }
+        // 1=Cerrada | 2=Abierta | 3=Pendiente | 4=Aprobada
+        public int Estado { get; set; } = 1;
         // Relación: una junta tiene muchos votantes
         public ICollection<Votante> Votantes { get; set; } = new List<Votante>();
     }
