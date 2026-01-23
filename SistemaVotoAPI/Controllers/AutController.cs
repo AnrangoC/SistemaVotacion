@@ -1,8 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
-using SistemaVotoAPI.DTOs;
-using SistemaVotoAPI.Security; // Donde se encuentra tu PasswordHasher
+using SistemaVotoAPI.Security;
+using SistemaVotoModelos.DTOs; // CAMBIO: Usando el namespace centralizado
+using System;
 using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Controllers
@@ -18,7 +19,6 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // POST: api/Aut/LoginGestion
         [HttpPost("LoginGestion")]
         public async Task<IActionResult> LoginGestion([FromBody] LoginRequestDto request)
         {
@@ -27,56 +27,46 @@ namespace SistemaVotoAPI.Controllers
                 return BadRequest("Datos de inicio de sesión incompletos.");
             }
 
-            // 1. Buscar al usuario por cédula. 
-            // Filtramos para que solo entren Roles 1 (Admin) o 3 (Jefe de Junta) y que estén activos (Estado == true)
-            var usuario = await _context.Votantes
-                .FirstOrDefaultAsync(v => v.Cedula == request.Cedula && v.Estado == true);
-
-            if (usuario == null)
+            try
             {
-                return Unauthorized("Usuario no encontrado o inactivo.");
+                // Tu lógica original
+                var usuario = await _context.Votantes
+                    .FirstOrDefaultAsync(v => v.Cedula == request.Cedula && v.Estado == true);
+
+                if (usuario == null)
+                {
+                    return Unauthorized("Usuario no encontrado o inactivo.");
+                }
+
+                if (usuario.RolId != 1 && usuario.RolId != 3)
+                {
+                    return Unauthorized("El usuario no tiene permisos de gestión.");
+                }
+
+                bool isPasswordValid = PasswordHasher.Verify(request.Password, usuario.Password);
+                if (!isPasswordValid)
+                {
+                    return Unauthorized("Cédula o contraseña incorrecta.");
+                }
+
+                // Tu mapeo original (Asegurado contra nulos)
+                var response = new LoginResponseDto
+                {
+                    Cedula = usuario.Cedula,
+                    NombreCompleto = usuario.NombreCompleto ?? "Sin nombre",
+                    Email = usuario.Email ?? "Sin email",
+                    FotoUrl = usuario.FotoUrl,
+                    RolId = usuario.RolId,
+                    JuntaId = usuario.JuntaId
+                };
+
+                return Ok(response);
             }
-
-            // 2. Verificar si tiene el Rol permitido para la gestión
-            if (usuario.RolId != 1 && usuario.RolId != 3)
+            catch (Exception ex)
             {
-                return Unauthorized("El usuario no tiene permisos de gestión.");
+                // Esto evita que la API se caiga y te dice qué pasó
+                return StatusCode(500, $"Error interno del servidor: {ex.Message}");
             }
-
-            // 3. Verificar la contraseña usando tu clase de seguridad
-            bool isPasswordValid = PasswordHasher.Verify(request.Password, usuario.Password);
-
-            if (!isPasswordValid)
-            {
-                return Unauthorized("Cédula o contraseña incorrecta.");
-            }
-
-            // 4. Responder con los datos necesarios para que el MVC cree la sesión/cookie
-            var response = new LoginResponseDto
-            {
-                Cedula = usuario.Cedula,
-                NombreCompleto = usuario.NombreCompleto,
-                Email = usuario.Email,
-                RolId = usuario.RolId,
-                JuntaId = usuario.JuntaId
-            };
-
-            return Ok(response);
-        }
-
-        // Si necesitas un método para votantes normales (Opcional)
-        [HttpPost("LoginVotante")]
-        public async Task<IActionResult> LoginVotante([FromBody] LoginRequestDto request)
-        {
-            var usuario = await _context.Votantes
-                .FirstOrDefaultAsync(v => v.Cedula == request.Cedula && v.RolId == 2 && v.Estado == true);
-
-            if (usuario == null || !PasswordHasher.Verify(request.Password, usuario.Password))
-            {
-                return Unauthorized("Credenciales inválidas para votante.");
-            }
-
-            return Ok(new { usuario.Cedula, usuario.NombreCompleto, usuario.RolId });
         }
     }
 }

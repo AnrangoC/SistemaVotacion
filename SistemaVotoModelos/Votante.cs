@@ -15,7 +15,6 @@ namespace SistemaVotoModelos
         [EmailAddress]
         [RegularExpression(@"^[^@\s]+@(utn\.edu\.ec|gmail\.com|outlook\.com|live\.com|hotmail\.com)$")]
         public string Email { get; set; } = string.Empty;
-        [Required]
         public string Password { get; set; } = string.Empty;
         public string FotoUrl { get; set; } = string.Empty;
         // 1: Admin | 2: Votante | 3: Jefe de Junta
