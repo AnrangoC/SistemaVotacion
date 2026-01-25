@@ -10,4 +10,8 @@
     <ProjectReference Include="..\SistemaVotoModelos\SistemaVotoModelos.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Views\Cuentas\" />
+  </ItemGroup>
+
 </Project>

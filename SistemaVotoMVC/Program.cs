@@ -1,40 +1,38 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
+ï»¿using Microsoft.AspNetCore.Authentication.Cookies;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// 1. Configuración de Controladores y Vistas con JSON flexible
+// 1. Controllers + Views (JSON flexible para la API)
 builder.Services.AddControllersWithViews()
     .AddJsonOptions(options =>
     {
-        // LOGICA: Esto permite que el DTO en C# (NombreCompleto) acepte 
-        // el JSON de la API (nombreCompleto) sin usar [JsonPropertyName]
         options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     });
 
-// 2. Configuración de Autenticación por Cookies
+// 2. AutenticaciÃ³n por Cookies
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.LoginPath = "/Aut/Login";      // Ruta si el usuario no está logueado
-        options.AccessDeniedPath = "/Home/Privacy"; // Ruta si el usuario no tiene permisos
-        options.ExpireTimeSpan = TimeSpan.FromMinutes(60); // Duración de la sesión
+        options.LoginPath = "/Aut/Login";           // Si no estÃ¡ logueado
+        options.AccessDeniedPath = "/Aut/Login";    // Si no tiene rol
+        options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
+        options.SlidingExpiration = true;
     });
 
-// 3. Configuración del Cliente HTTP para conectar con la API
+// 3. Cliente HTTP para consumir la API
 builder.Services.AddHttpClient("SistemaVotoAPI", client =>
 {
-    // Asegúrate de que este puerto coincida con el de tu SistemaVotoAPI
     client.BaseAddress = new Uri("https://localhost:7062/");
 });
 
-// 4. Inyección de IHttpContextAccessor (Útil para acceder a la sesión en las vistas)
+// 4. HttpContextAccessor (claims, usuario, etc.)
 builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
-// 5. Configuración del Pipeline de HTTP (Middleware)
+// 5. Middleware
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
@@ -46,14 +44,13 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-// LOGICA: El orden aquí es CRÍTICO. 
-// Primero Authentication (quién eres) y luego Authorization (qué puedes hacer)
+// IMPORTANTE: Auth primero, luego Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 6. Configuración de la Ruta por Defecto (Apunta a tu nuevo AutController)
+// 6. Ruta por defecto â†’ Ventana inicial
 app.MapControllerRoute(
     name: "default",
-    pattern: "{controller=Aut}/{action=Login}/{id?}");
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();

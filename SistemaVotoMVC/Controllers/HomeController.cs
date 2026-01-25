@@ -6,12 +6,12 @@ namespace SistemaVotoMVC.Controllers
     {
         public IActionResult Index()
         {
-            return View();
+           return View();
         }
 
-        public IActionResult Acceder()
-        {
-            return RedirectToAction("Login", "Aut");
-        }
+        //public IActionResult Acceder()
+        //{
+        //    return RedirectToAction("Login", "Aut");
+        //}
     }
 }

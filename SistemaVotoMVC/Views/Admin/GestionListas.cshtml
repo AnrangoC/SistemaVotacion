@@ -1,0 +1,185 @@
+﻿@model IEnumerable<SistemaVotoModelos.Lista>
+
+@{
+    ViewData["Title"] = "Gestión de Listas";
+    var eleccion = ViewBag.Eleccion as SistemaVotoModelos.Eleccion;
+    int eleccionId = eleccion?.Id ?? 0;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-0">📌 Listas de la elección</h3>
+        <div class="text-muted">
+            <strong>@(eleccion?.Titulo ?? "Elección")</strong> — Estado:
+            <span class="badge @(eleccion?.Estado == "CONFIGURACION" ? "bg-secondary" : eleccion?.Estado == "ACTIVA" ? "bg-success" : "bg-dark")">
+                @(eleccion?.Estado ?? "-")
+            </span>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a asp-action="GestionElecciones" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Volver
+        </a>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevaLista">
+            <i class="bi bi-plus-circle"></i> Nueva lista
+        </button>
+    </div>
+</div>
+
+@if (TempData["Mensaje"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">@TempData["Mensaje"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">@TempData["Error"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <span class="fw-semibold">Listado de listas</span>
+
+        <div class="input-group" style="max-width: 320px;">
+            <span class="input-group-text bg-light">🔎</span>
+            <input id="filtro" class="form-control" placeholder="Buscar por nombre..." onkeyup="filtrarTabla()" />
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="tablaListas">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width:90px;">Id</th>
+                        <th>Nombre</th>
+                        <th>LogoUrl</th>
+                        <th style="width:240px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var l in Model)
+                    {
+                        <tr class="fila">
+                            <td class="col-id">@l.Id</td>
+                            <td class="col-nombre">@l.NombreLista</td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(l.LogoUrl))
+                                {
+                                    <a href="@l.LogoUrl" target="_blank">@l.LogoUrl</a>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Sin logo</span>
+                                }
+                            </td>
+                            <td class="d-flex gap-2">
+                                <button class="btn btn-info btn-sm text-white"
+                                        onclick="abrirEditar('@l.Id','@Html.Raw((l.NombreLista ?? "").Replace("'", "\\'"))','@Html.Raw((l.LogoUrl ?? "").Replace("'", "\\'"))')">
+                                    <i class="bi bi-pencil-square"></i> Editar
+                                </button>
+
+                                <form asp-action="EliminarLista" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@l.Id" />
+                                    <input type="hidden" name="eleccionId" value="@eleccionId" />
+                                    <button class="btn btn-outline-danger btn-sm"
+                                            onclick="return confirm('¿Eliminar la lista ID @l.Id?')">
+                                        <i class="bi bi-trash"></i> Eliminar
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            @if (!Model.Any())
+            {
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-inbox fs-1"></i>
+                    <div class="mt-2">No hay listas registradas para esta elección.</div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: NUEVA LISTA -->
+<div class="modal fade" id="modalNuevaLista" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form asp-action="CrearLista" method="post" class="modal-content border-0 shadow">
+            @Html.AntiForgeryToken()
+
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Nueva lista</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <input type="hidden" name="EleccionId" value="@eleccionId" />
+
+                <label class="fw-semibold">Nombre de la lista</label>
+                <input name="NombreLista" class="form-control mb-3" required placeholder="Ej: Lista A" />
+
+                <label class="fw-semibold">LogoUrl (opcional)</label>
+                <input name="LogoUrl" class="form-control" placeholder="https://..." />
+            </div>
+
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-primary w-100">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: EDITAR LISTA -->
+<div class="modal fade" id="modalEditarLista" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form asp-action="EditarLista" method="post" class="modal-content border-0 shadow">
+            @Html.AntiForgeryToken()
+
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Editar lista</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <input type="hidden" name="Id" id="editId" />
+                <input type="hidden" name="EleccionId" value="@eleccionId" />
+
+                <label class="fw-semibold">Nombre</label>
+                <input name="NombreLista" id="editNombre" class="form-control mb-3" required />
+
+                <label class="fw-semibold">LogoUrl (opcional)</label>
+                <input name="LogoUrl" id="editLogo" class="form-control" />
+            </div>
+
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-info text-white w-100">Actualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function abrirEditar(id, nombre, logo) {
+            document.getElementById("editId").value = id;
+            document.getElementById("editNombre").value = nombre || "";
+            document.getElementById("editLogo").value = logo || "";
+            new bootstrap.Modal(document.getElementById('modalEditarLista')).show();
+        }
+
+        function filtrarTabla() {
+            const q = (document.getElementById("filtro").value || "").toLowerCase();
+            const filas = document.querySelectorAll("#tablaListas tbody .fila");
+
+            filas.forEach(f => {
+                const nombre = (f.querySelector(".col-nombre")?.innerText || "").toLowerCase();
+                const id = (f.querySelector(".col-id")?.innerText || "").toLowerCase();
+                f.style.display = (nombre.includes(q) || id.includes(q)) ? "" : "none";
+            });
+        }
+    </script>
+}

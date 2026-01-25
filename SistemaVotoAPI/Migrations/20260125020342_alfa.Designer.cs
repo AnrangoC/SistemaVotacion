@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SistemaVotoAPI.Data;
@@ -11,9 +12,11 @@ using SistemaVotoAPI.Data;
 namespace SistemaVotoAPI.Migrations
 {
     [DbContext(typeof(APIVotosDbContext))]
-    partial class APIVotosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260125020342_alfa")]
+    partial class alfa
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,41 +24,6 @@ namespace SistemaVotoAPI.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("SistemaVotoModelos.Candidato", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Cedula")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<int>("EleccionId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ListaId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("RolPostulante")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EleccionId");
-
-                    b.HasIndex("ListaId");
-
-                    b.HasIndex("Cedula", "EleccionId")
-                        .IsUnique();
-
-                    b.ToTable("Candidatos");
-                });
 
             modelBuilder.Entity("SistemaVotoModelos.Direccion", b =>
                 {
@@ -124,6 +92,7 @@ namespace SistemaVotoAPI.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("JefeDeJuntaId")
+                        .IsRequired()
                         .HasColumnType("character varying(10)");
 
                     b.Property<int>("NumeroMesa")
@@ -200,6 +169,11 @@ namespace SistemaVotoAPI.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
+                    b.Property<string>("Discriminator")
+                        .IsRequired()
+                        .HasMaxLength(13)
+                        .HasColumnType("character varying(13)");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text");
@@ -233,6 +207,10 @@ namespace SistemaVotoAPI.Migrations
                     b.HasIndex("JuntaId");
 
                     b.ToTable("Votantes");
+
+                    b.HasDiscriminator<string>("Discriminator").HasValue("VOTANTE");
+
+                    b.UseTphMappingStrategy();
                 });
 
             modelBuilder.Entity("SistemaVotoModelos.VotoAnonimo", b =>
@@ -275,29 +253,23 @@ namespace SistemaVotoAPI.Migrations
 
             modelBuilder.Entity("SistemaVotoModelos.Candidato", b =>
                 {
-                    b.HasOne("SistemaVotoModelos.Votante", "Votante")
-                        .WithMany()
-                        .HasForeignKey("Cedula")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.HasBaseType("SistemaVotoModelos.Votante");
 
-                    b.HasOne("SistemaVotoModelos.Eleccion", "Eleccion")
-                        .WithMany()
-                        .HasForeignKey("EleccionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.Property<int>("EleccionId")
+                        .HasColumnType("integer");
 
-                    b.HasOne("SistemaVotoModelos.Lista", "Lista")
-                        .WithMany()
-                        .HasForeignKey("ListaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.Property<int>("ListaId")
+                        .HasColumnType("integer");
 
-                    b.Navigation("Eleccion");
+                    b.Property<string>("RolPostulante")
+                        .IsRequired()
+                        .HasColumnType("text");
 
-                    b.Navigation("Lista");
+                    b.HasIndex("EleccionId");
 
-                    b.Navigation("Votante");
+                    b.HasIndex("ListaId");
+
+                    b.HasDiscriminator().HasValue("CANDIDATO");
                 });
 
             modelBuilder.Entity("SistemaVotoModelos.Junta", b =>
@@ -305,13 +277,14 @@ namespace SistemaVotoAPI.Migrations
                     b.HasOne("SistemaVotoModelos.Direccion", "Direccion")
                         .WithMany()
                         .HasForeignKey("DireccionId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("SistemaVotoModelos.Votante", "JefeDeJunta")
                         .WithMany()
                         .HasForeignKey("JefeDeJuntaId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Direccion");
 
@@ -355,6 +328,25 @@ namespace SistemaVotoAPI.Migrations
                         .HasForeignKey("EleccionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("SistemaVotoModelos.Candidato", b =>
+                {
+                    b.HasOne("SistemaVotoModelos.Eleccion", "Eleccion")
+                        .WithMany()
+                        .HasForeignKey("EleccionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SistemaVotoModelos.Lista", "Lista")
+                        .WithMany()
+                        .HasForeignKey("ListaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Eleccion");
+
+                    b.Navigation("Lista");
                 });
 
             modelBuilder.Entity("SistemaVotoModelos.Junta", b =>

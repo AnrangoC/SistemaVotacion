@@ -2,7 +2,9 @@
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
 using SistemaVotoAPI.Security;
-using SistemaVotoModelos.DTOs; // CAMBIO: Usando el namespace centralizado
+using SistemaVotoModelos;
+using SistemaVotoModelos.DTOs;
+using SistemaVotoMVC.DTOs;
 using System;
 using System.Threading.Tasks;
 

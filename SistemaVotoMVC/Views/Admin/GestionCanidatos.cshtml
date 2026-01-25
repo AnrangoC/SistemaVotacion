@@ -1,0 +1,206 @@
+﻿@model IEnumerable<SistemaVotoModelos.Candidato>
+
+@{
+    ViewData["Title"] = "Gestión de Candidatos";
+    var eleccion = ViewBag.Eleccion as SistemaVotoModelos.Eleccion;
+    var listas = ViewBag.Listas as List<SistemaVotoModelos.Lista> ?? new List<SistemaVotoModelos.Lista>();
+    int eleccionId = eleccion?.Id ?? 0;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="mb-0">👥 Candidatos de la elección</h3>
+        <div class="text-muted">
+            <strong>@(eleccion?.Titulo ?? "Elección")</strong> — Estado:
+            <span class="badge @(eleccion?.Estado == "CONFIGURACION" ? "bg-secondary" : eleccion?.Estado == "ACTIVA" ? "bg-success" : "bg-dark")">
+                @(eleccion?.Estado ?? "-")
+            </span>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a asp-action="GestionElecciones" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Volver
+        </a>
+        <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNuevoCandidato">
+            <i class="bi bi-plus-circle"></i> Nuevo candidato
+        </button>
+    </div>
+</div>
+
+@if (TempData["Mensaje"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">@TempData["Mensaje"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">@TempData["Error"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+        <span class="fw-semibold">Listado de candidatos</span>
+
+        <div class="input-group" style="max-width: 360px;">
+            <span class="input-group-text bg-light">🔎</span>
+            <input id="filtro" class="form-control" placeholder="Buscar por cédula / nombre / rol..." onkeyup="filtrarTabla()" />
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="tablaCandidatos">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width:90px;">Id</th>
+                        <th style="width:140px;">Cédula</th>
+                        <th>Nombre</th>
+                        <th style="width:160px;">Lista</th>
+                        <th style="width:220px;">Rol postulante</th>
+                        <th style="width:280px;">Acciones</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    @foreach (var c in Model)
+                    {
+                        var nombre = c.Votante?.NombreCompleto ?? "Sin datos";
+                        var nombreLista = c.Lista?.NombreLista ?? $"ListaId {c.ListaId}";
+
+                        <tr class="fila">
+                            <td class="col-id">@c.Id</td>
+                            <td class="col-cedula">@c.Cedula</td>
+                            <td class="col-nombre">@nombre</td>
+                            <td class="col-lista">@nombreLista</td>
+                            <td class="col-rol">@c.RolPostulante</td>
+                            <td class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-info btn-sm text-white"
+                                        onclick="abrirEditar('@c.Id', '@c.ListaId', '@Html.Raw((c.RolPostulante ?? "").Replace("'", "\\'"))')">
+                                    <i class="bi bi-pencil-square"></i> Editar
+                                </button>
+
+                                <form asp-action="EliminarCandidato" method="post" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@c.Id" />
+                                    <input type="hidden" name="eleccionId" value="@eleccionId" />
+                                    <button class="btn btn-outline-danger btn-sm"
+                                            onclick="return confirm('¿Eliminar al candidato ID @c.Id?')">
+                                        <i class="bi bi-trash"></i> Eliminar
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            @if (!Model.Any())
+            {
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-inbox fs-1"></i>
+                    <div class="mt-2">No hay candidatos registrados para esta elección.</div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: NUEVO CANDIDATO -->
+<div class="modal fade" id="modalNuevoCandidato" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form asp-action="CrearCandidato" method="post" class="modal-content border-0 shadow">
+            @Html.AntiForgeryToken()
+
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Nuevo candidato</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <input type="hidden" name="EleccionId" value="@eleccionId" />
+
+                <label class="fw-semibold">Cédula del votante</label>
+                <input name="Cedula" class="form-control mb-3" maxlength="10" required placeholder="Ej: 0102030405" />
+
+                <label class="fw-semibold">Lista</label>
+                <select name="ListaId" class="form-select mb-3" required>
+                    <option value="">-- Selecciona --</option>
+                    @foreach (var l in listas)
+                    {
+                        <option value="@l.Id">@l.NombreLista (ID: @l.Id)</option>
+                    }
+                </select>
+
+                <label class="fw-semibold">Rol postulante</label>
+                <input name="RolPostulante" class="form-control" required placeholder="Ej: Alcalde / Presidente..." />
+
+                <div class="small text-muted mt-3">
+                    El candidato solo se puede registrar si la elección está en <strong>CONFIGURACION</strong>.
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-success w-100">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: EDITAR CANDIDATO -->
+<div class="modal fade" id="modalEditarCandidato" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <form asp-action="EditarCandidato" method="post" class="modal-content border-0 shadow">
+            @Html.AntiForgeryToken()
+
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Editar candidato</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <input type="hidden" name="id" id="editId" />
+                <input type="hidden" name="eleccionId" value="@eleccionId" />
+
+                <label class="fw-semibold">Lista</label>
+                <select name="listaId" id="editListaId" class="form-select mb-3" required>
+                    @foreach (var l in listas)
+                    {
+                        <option value="@l.Id">@l.NombreLista (ID: @l.Id)</option>
+                    }
+                </select>
+
+                <label class="fw-semibold">Rol postulante</label>
+                <input name="rolPostulante" id="editRolPostulante" class="form-control" required />
+            </div>
+
+            <div class="modal-footer">
+                <button type="submit" class="btn btn-info text-white w-100">Actualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function abrirEditar(id, listaId, rol) {
+            document.getElementById("editId").value = id;
+            document.getElementById("editListaId").value = listaId;
+            document.getElementById("editRolPostulante").value = rol || "";
+            new bootstrap.Modal(document.getElementById('modalEditarCandidato')).show();
+        }
+
+        function filtrarTabla() {
+            const q = (document.getElementById("filtro").value || "").toLowerCase();
+            const filas = document.querySelectorAll("#tablaCandidatos tbody .fila");
+
+            filas.forEach(f => {
+                const ced = (f.querySelector(".col-cedula")?.innerText || "").toLowerCase();
+                const nom = (f.querySelector(".col-nombre")?.innerText || "").toLowerCase();
+                const rol = (f.querySelector(".col-rol")?.innerText || "").toLowerCase();
+                const lis = (f.querySelector(".col-lista")?.innerText || "").toLowerCase();
+
+                f.style.display = (ced.includes(q) || nom.includes(q) || rol.includes(q) || lis.includes(q)) ? "" : "none";
+            });
+        }
+    </script>
+}

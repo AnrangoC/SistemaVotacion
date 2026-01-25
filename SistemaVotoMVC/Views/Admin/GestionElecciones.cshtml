@@ -1,0 +1,215 @@
+﻿@model IEnumerable<SistemaVotoModelos.Eleccion>
+
+@{
+    ViewData["Title"] = "Gestión de Elecciones";
+}
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="fw-bold mb-0">🗳️ Gestión de Elecciones</h3>
+            <small class="text-muted">Crea, edita y elimina procesos electorales</small>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a asp-controller="Admin" asp-action="Main" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Volver
+            </a>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNueva">
+                <i class="bi bi-plus-circle"></i> Nueva Elección
+            </button>
+        </div>
+    </div>
+
+    @if (TempData["Mensaje"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["Mensaje"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Título</th>
+                            <th>Inicio</th>
+                            <th>Fin</th>
+                            <th>Estado</th>
+                            <th class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model == null || !Model.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    No hay elecciones registradas.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            foreach (var e in Model)
+                            {
+                                <tr>
+                                    <td>@e.Id</td>
+                                    <td class="fw-semibold">@e.Titulo</td>
+                                    <td>@e.FechaInicio.ToString("yyyy-MM-dd")</td>
+                                    <td>@e.FechaFin.ToString("yyyy-MM-dd")</td>
+                                    <td>
+                                        <span class="badge
+                                                    @(e.Estado == "CONFIGURACION" ? "bg-secondary" :
+                                                                                            e.Estado == "ACTIVA" ? "bg-success" :
+                                                                                            e.Estado == "FINALIZADA" ? "bg-dark" : "bg-primary")">
+                                            @e.Estado
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <a class="btn btn-outline-primary btn-sm"
+                                               asp-action="GestionListas"
+                                               asp-route-eleccionId="@e.Id">
+                                                <i class="bi bi-card-list"></i> Listas
+                                            </a>
+
+                                            <a class="btn btn-outline-success btn-sm"
+                                               asp-action="GestionCandidatos"
+                                               asp-route-eleccionId="@e.Id">
+                                                <i class="bi bi-people"></i> Candidatos
+                                            </a>
+
+                                            <button class="btn btn-info btn-sm text-white"
+                                                    onclick="abrirEditar('@e.Id','@e.Titulo','@e.FechaInicio.ToString("yyyy-MM-dd")','@e.FechaFin.ToString("yyyy-MM-dd")','@e.Estado')">
+                                                <i class="bi bi-pencil-square"></i>
+                                            </button>
+
+                                            <form asp-action="EliminarEleccion" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="id" value="@e.Id" />
+                                                <button class="btn btn-outline-danger btn-sm"
+                                                        onclick="return confirm('¿Eliminar esta elección?')">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: NUEVA ELECCIÓN -->
+<div class="modal fade" id="modalNueva" tabindex="-1">
+    <div class="modal-dialog">
+        <form asp-action="CrearEleccion" method="post" class="modal-content">
+            @Html.AntiForgeryToken()
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Nueva Elección</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <label class="fw-bold">Título</label>
+                <input name="Titulo" class="form-control mb-3" required />
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="fw-bold">Fecha Inicio</label>
+                        <input name="FechaInicio" type="date" class="form-control mb-3" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="fw-bold">Fecha Fin</label>
+                        <input name="FechaFin" type="date" class="form-control mb-3" required />
+                    </div>
+                </div>
+
+                <label class="fw-bold">Estado</label>
+                <select name="Estado" class="form-select">
+                    <option value="CONFIGURACION" selected>CONFIGURACION</option>
+                    <option value="ACTIVA">ACTIVA</option>
+                    <option value="FINALIZADA">FINALIZADA</option>
+                </select>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-success w-100" type="submit">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL: EDITAR ELECCIÓN -->
+<div class="modal fade" id="modalEditar" tabindex="-1">
+    <div class="modal-dialog">
+        <form asp-action="EditarEleccion" method="post" class="modal-content">
+            @Html.AntiForgeryToken()
+
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">Editar Elección</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <input type="hidden" name="Id" id="editId" />
+
+                <label class="fw-bold">Título</label>
+                <input name="Titulo" id="editTitulo" class="form-control mb-3" required />
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="fw-bold">Fecha Inicio</label>
+                        <input name="FechaInicio" id="editInicio" type="date" class="form-control mb-3" required />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="fw-bold">Fecha Fin</label>
+                        <input name="FechaFin" id="editFin" type="date" class="form-control mb-3" required />
+                    </div>
+                </div>
+
+                <label class="fw-bold">Estado</label>
+                <select name="Estado" id="editEstado" class="form-select">
+                    <option value="CONFIGURACION">CONFIGURACION</option>
+                    <option value="ACTIVA">ACTIVA</option>
+                    <option value="FINALIZADA">FINALIZADA</option>
+                </select>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-info w-100 text-white" type="submit">Actualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function abrirEditar(id, titulo, inicio, fin, estado) {
+            document.getElementById('editId').value = id;
+            document.getElementById('editTitulo').value = titulo;
+            document.getElementById('editInicio').value = inicio;
+            document.getElementById('editFin').value = fin;
+            document.getElementById('editEstado').value = estado;
+
+            new bootstrap.Modal(document.getElementById('modalEditar')).show();
+        }
+    </script>
+}

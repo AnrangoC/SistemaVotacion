@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace SistemaVotoModelos
 {
@@ -9,14 +8,15 @@ namespace SistemaVotoModelos
         public int Id { get; set; }
         [Required]
         public int NumeroMesa { get; set; }
+        [Required]
         public int DireccionId { get; set; }
         public Direccion? Direccion { get; set; }
-        [Required]
-        public string JefeDeJuntaId { get; set; } = string.Empty;
+        // Se asigna después, por eso puede ser null
+        public string? JefeDeJuntaId { get; set; }
         public Votante? JefeDeJunta { get; set; }
         // 1=Cerrada | 2=Abierta | 3=Pendiente | 4=Aprobada
         public int Estado { get; set; } = 1;
-        // Relación: una junta tiene muchos votantes
         public ICollection<Votante> Votantes { get; set; } = new List<Votante>();
     }
 }
+

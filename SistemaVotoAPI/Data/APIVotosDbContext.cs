@@ -10,7 +10,6 @@ namespace SistemaVotoAPI.Data
         {
         }
 
-        // DbSets
         public DbSet<Votante> Votantes { get; set; } = default!;
         public DbSet<Candidato> Candidatos { get; set; } = default!;
         public DbSet<Eleccion> Elecciones { get; set; } = default!;
@@ -24,7 +23,7 @@ namespace SistemaVotoAPI.Data
         {
             base.OnModelCreating(modelBuilder);
 
-            // ---------------- VOTANTE ----------------
+            // VOTANTE
             modelBuilder.Entity<Votante>()
                 .HasKey(v => v.Cedula);
 
@@ -34,15 +33,19 @@ namespace SistemaVotoAPI.Data
                 .HasForeignKey(v => v.JuntaId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // HERENCIA VOTANTE -> CANDIDATO 
-            modelBuilder.Entity<Votante>()
-                .HasDiscriminator<string>("Discriminator")
-                .HasValue<Votante>("VOTANTE")
-                .HasValue<Candidato>("CANDIDATO");
+            // DIRECCION
+            modelBuilder.Entity<Direccion>()
+                .HasKey(d => d.Id);
 
             // JUNTA
             modelBuilder.Entity<Junta>()
                 .HasKey(j => j.Id);
+
+            modelBuilder.Entity<Junta>()
+                .HasOne(j => j.Direccion)
+                .WithMany()
+                .HasForeignKey(j => j.DireccionId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Junta>()
                 .HasOne(j => j.JefeDeJunta)
@@ -50,15 +53,11 @@ namespace SistemaVotoAPI.Data
                 .HasForeignKey(j => j.JefeDeJuntaId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // DIRECCION
-            modelBuilder.Entity<Direccion>()
-                .HasKey(d => d.Id);
-
             // ELECCION
             modelBuilder.Entity<Eleccion>()
                 .HasKey(e => e.Id);
 
-            //LISTA
+            // LISTA -> ELECCION
             modelBuilder.Entity<Lista>()
                 .HasKey(l => l.Id);
 
@@ -68,7 +67,34 @@ namespace SistemaVotoAPI.Data
                 .HasForeignKey(l => l.EleccionId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            //TOKEN ACCESO
+            // CANDIDATO (tabla propia)
+            modelBuilder.Entity<Candidato>()
+                .HasKey(c => c.Id);
+
+            modelBuilder.Entity<Candidato>()
+                .HasOne(c => c.Votante)
+                .WithMany()
+                .HasForeignKey(c => c.Cedula)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Candidato>()
+                .HasOne(c => c.Eleccion)
+                .WithMany()
+                .HasForeignKey(c => c.EleccionId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Candidato>()
+                .HasOne(c => c.Lista)
+                .WithMany()
+                .HasForeignKey(c => c.ListaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Un votante no puede ser candidato 2 veces en la misma elección
+            modelBuilder.Entity<Candidato>()
+                .HasIndex(c => new { c.Cedula, c.EleccionId })
+                .IsUnique();
+
+            // TOKEN ACCESO
             modelBuilder.Entity<TokenAcceso>()
                 .HasKey(t => t.Id);
 
@@ -79,7 +105,6 @@ namespace SistemaVotoAPI.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             // VOTO ANONIMO
-            // NO tiene relación con Votante ni Candidato
             modelBuilder.Entity<VotoAnonimo>()
                 .HasKey(v => v.Id);
 

@@ -1,15 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
 using SistemaVotoModelos;
+using SistemaVotoModelos.DTOs;
 
 namespace SistemaVotoAPI.Controllers
 {
+    [Authorize(Roles = "1")]
     [Route("api/[controller]")]
     [ApiController]
     public class JuntasController : ControllerBase
@@ -21,61 +22,69 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // GET: api/Juntas
+        // Devuelvo las juntas mostrando la dirección en texto y el nombre completo del jefe si existe
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Junta>>> GetJuntas()
+        public async Task<ActionResult<IEnumerable<JuntaDetalleDto>>> GetJuntas()
         {
-            return await _context.Juntas
+            var juntas = await _context.Juntas
                 .Include(j => j.Direccion)
                 .Include(j => j.JefeDeJunta)
+                .Select(j => new JuntaDetalleDto
+                {
+                    Id = j.Id,
+                    NumeroMesa = j.NumeroMesa,
+                    Ubicacion = $"{j.Direccion.Provincia} - {j.Direccion.Canton} - {j.Direccion.Parroquia}",
+                    NombreJefe = j.JefeDeJuntaId == string.Empty
+                        ? "Sin asignar"
+                        : j.JefeDeJunta.NombreCompleto,
+                    EstadoJunta = j.Estado
+                })
+                .OrderBy(j => j.Id)
                 .ToListAsync();
+
+            return Ok(juntas);
         }
 
-        // GET: api/Juntas/5
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Junta>> GetJunta(int id)
+        // Creo juntas automáticamente para una dirección existente, sin asignar jefe
+        [HttpPost("CrearPorDireccion")]
+        public async Task<IActionResult> CrearPorDireccion(int direccionId, int cantidad)
         {
-            var junta = await _context.Juntas
-                .Include(j => j.Direccion)
-                .Include(j => j.JefeDeJunta)
-                .FirstOrDefaultAsync(j => j.Id == id);
+            var direccion = await _context.Direcciones.FindAsync(direccionId);
+            if (direccion == null)
+                return BadRequest("La dirección no existe");
 
-            if (junta == null)
+            if (cantidad <= 0)
+                return BadRequest("La cantidad debe ser mayor a cero");
+
+            int mesasExistentes = await _context.Juntas
+                .CountAsync(j => j.DireccionId == direccionId);
+
+            var nuevasJuntas = new List<Junta>();
+
+            for (int i = 1; i <= cantidad; i++)
             {
-                return NotFound();
+                int numeroMesa = mesasExistentes + i;
+                int juntaId = int.Parse($"{direccion.Id}{numeroMesa:D2}");
+
+                nuevasJuntas.Add(new Junta
+                {
+                    Id = juntaId,
+                    NumeroMesa = numeroMesa,
+                    DireccionId = direccion.Id,
+                    JefeDeJuntaId = string.Empty,
+                    Estado = 1
+                });
             }
 
-            return junta;
+            _context.Juntas.AddRange(nuevasJuntas);
+            await _context.SaveChangesAsync();
+
+            return Ok("Juntas creadas correctamente");
         }
 
-        // PUT: api/Juntas/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        //
-        // Este método NO debe usarse para editar:
-        // - Número de mesa
-        // - Dirección
-        //
-        // Solo se mantiene por el scaffold de Entity Framework.
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutJunta(int id, Junta junta)
-        {
-            if (id != junta.Id)
-            {
-                return BadRequest();
-            }
-
-            return BadRequest(
-                "No está permitido modificar número de mesa ni dirección de una junta"
-            );
-        }
-
-        // PUT: api/Juntas/AsignarJefe/5
-        //
-        // Asigna o cambia el jefe de junta
-        // El jefe debe existir previamente como votante
-        // Al asignarlo, su RolId se cambia automáticamente a 3
-        [HttpPut("AsignarJefe/{juntaId}")]
-        public async Task<IActionResult> AsignarJefeDeJunta(int juntaId, string cedulaVotante)
+        // Asigno un jefe de junta usando únicamente la cédula del votante
+        [HttpPut("AsignarJefe")]
+        public async Task<IActionResult> AsignarJefe(int juntaId, string cedulaVotante)
         {
             var junta = await _context.Juntas.FindAsync(juntaId);
             if (junta == null)
@@ -85,61 +94,31 @@ namespace SistemaVotoAPI.Controllers
             if (votante == null)
                 return NotFound("El votante no existe");
 
-            // El votante no puede ser administrador ni candidato
-            if (votante.RolId == 1)
-                return BadRequest("Un administrador no puede ser jefe de junta");
-
             bool esCandidato = await _context.Candidatos
                 .AnyAsync(c => c.Cedula == cedulaVotante);
 
             if (esCandidato)
                 return BadRequest("Un candidato no puede ser jefe de junta");
 
-            // Se asigna como jefe de junta
             junta.JefeDeJuntaId = cedulaVotante;
-
-            // Se cambia el rol del votante a Jefe de Junta
             votante.RolId = 3;
 
             await _context.SaveChangesAsync();
             return Ok("Jefe de junta asignado correctamente");
         }
 
-        // POST: api/Juntas
-        //
-        // La junta se crea una sola vez
-        // Número de mesa y dirección quedan fijos
-        [HttpPost]
-        public async Task<ActionResult<Junta>> PostJunta(Junta junta)
-        {
-            _context.Juntas.Add(junta);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction("GetJunta", new { id = junta.Id }, junta);
-        }
-
-        // DELETE: api/Juntas/5
-        //
-        // Normalmente no se elimina una junta,
-        // se mantiene solo para control administrativo
+        // Elimino juntas solo por control administrativo
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteJunta(int id)
         {
             var junta = await _context.Juntas.FindAsync(id);
             if (junta == null)
-            {
                 return NotFound();
-            }
 
             _context.Juntas.Remove(junta);
             await _context.SaveChangesAsync();
 
             return NoContent();
-        }
-
-        private bool JuntaExists(int id)
-        {
-            return _context.Juntas.Any(e => e.Id == id);
         }
     }
 }

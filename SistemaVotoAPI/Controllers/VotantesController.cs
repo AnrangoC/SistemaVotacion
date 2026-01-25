@@ -76,6 +76,19 @@ namespace SistemaVotoAPI.Controllers
             }
 
             /*
+             Lógica de consistencia:
+             Si se envía una junta, debe existir
+            */
+            if (votante.JuntaId.HasValue)
+            {
+                bool existeJunta = await _context.Juntas
+                    .AnyAsync(j => j.Id == votante.JuntaId.Value);
+
+                if (!existeJunta)
+                    return BadRequest("La junta asignada no existe.");
+            }
+
+            /*
              Lógica de seguridad:
              La contraseña se almacena siempre como hash
             */
@@ -92,6 +105,7 @@ namespace SistemaVotoAPI.Controllers
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetVotante), new { cedula = votante.Cedula }, votante);
+        
         }
 
         // PUT: api/Votantes/0102030405

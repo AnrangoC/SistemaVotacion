@@ -1,10 +1,8 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using MiniExcelLibs;
 using SistemaVotoAPI.Data;
 using SistemaVotoModelos;
-using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Controllers
@@ -20,82 +18,108 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        [HttpPost("CargaMasiva")]
-        public async Task<IActionResult> CargaMasiva(IFormFile archivo)
+        // Para obtener todas las direcciones ordenadas por Id para mostrarlas de forma consistente
+        [HttpGet]
+        public async Task<IActionResult> ObtenerTodas()
         {
-            if (archivo == null || archivo.Length == 0)
-                return BadRequest("Archivo no proporcionado.");
+            var lista = await _context.Direcciones
+                .OrderBy(d => d.Id)
+                .ToListAsync();
 
-            using var stream = archivo.OpenReadStream();
-            var filas = stream.Query(useHeaderRow: true);
+            return Ok(lista);
+        }
 
-            var provincias = new Dictionary<string, int>();
-            var cantones = new Dictionary<(string prov, string cant), int>();
-            var parroquias = new Dictionary<(string prov, string cant, string parr), int>();
-
-            var contadorCantones = new Dictionary<string, int>();
-            var contadorParroquias = new Dictionary<(string prov, string cant), int>();
-
-            int provinciaSeq = 1;
-
-            foreach (var fila in filas)
+        // Crear una nueva dirección validando que no exista y generando el Id jerárquico
+        [HttpPost]
+        public async Task<IActionResult> Crear([FromBody] Direccion dto)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Provincia) ||
+                string.IsNullOrWhiteSpace(dto.Canton) ||
+                string.IsNullOrWhiteSpace(dto.Parroquia))
             {
-                string provincia = fila.Provincia?.ToString().Trim();
-                string canton = fila.Canton?.ToString().Trim();
-                string parroquia = fila.Parroquia?.ToString().Trim();
-
-                if (string.IsNullOrWhiteSpace(provincia) ||
-                    string.IsNullOrWhiteSpace(canton) ||
-                    string.IsNullOrWhiteSpace(parroquia))
-                    continue;
-
-                // PROVINCIA
-                if (!provincias.ContainsKey(provincia))
-                {
-                    provincias[provincia] = provinciaSeq++;
-                    contadorCantones[provincia] = 1;
-                }
-
-                int provId = provincias[provincia];
-
-                // CANTÓN (por provincia)
-                var cantKey = (provincia, canton);
-                if (!cantones.ContainsKey(cantKey))
-                {
-                    cantones[cantKey] = contadorCantones[provincia]++;
-                    contadorParroquias[cantKey] = 1;
-                }
-
-                int cantId = cantones[cantKey];
-
-                // PARROQUIA (por cantón)
-                var parrKey = (provincia, canton, parroquia);
-                if (!parroquias.ContainsKey(parrKey))
-                {
-                    parroquias[parrKey] = contadorParroquias[cantKey]++;
-                }
-
-                int parrId = parroquias[parrKey];
-
-                int direccionId = int.Parse($"{provId:D2}{cantId:D2}{parrId:D2}");
-
-                bool existe = await _context.Direcciones
-                    .AnyAsync(d => d.Id == direccionId);
-
-                if (!existe)
-                {
-                    _context.Direcciones.Add(new Direccion
-                    {
-                        Id = direccionId,
-                        Provincia = provincia,
-                        Canton = canton,
-                        Parroquia = parroquia
-                    });
-                }
+                return BadRequest("Provincia, Cantón y Parroquia son obligatorios.");
             }
 
+            bool existe = await _context.Direcciones.AnyAsync(d =>
+                d.Provincia == dto.Provincia &&
+                d.Canton == dto.Canton &&
+                d.Parroquia == dto.Parroquia
+            );
+
+            if (existe)
+                return Conflict("La dirección ya existe.");
+
+            int nuevoId = await GenerarIdAsync(
+                dto.Provincia.Trim(),
+                dto.Canton.Trim(),
+                dto.Parroquia.Trim()
+            );
+
+            var direccion = new Direccion
+            {
+                Id = nuevoId,
+                Provincia = dto.Provincia.Trim(),
+                Canton = dto.Canton.Trim(),
+                Parroquia = dto.Parroquia.Trim()
+            };
+
+            _context.Direcciones.Add(direccion);
             await _context.SaveChangesAsync();
-            return Ok("Carga masiva de direcciones completada.");
+
+            return Ok(direccion);
+        }
+
+        // Aquí elimino una dirección solo por Id, asumiendo que no está referenciada en otras tablas
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> Eliminar(int id)
+        {
+            var direccion = await _context.Direcciones.FindAsync(id);
+
+            if (direccion == null)
+                return NotFound("La dirección no existe.");
+
+            _context.Direcciones.Remove(direccion);
+            await _context.SaveChangesAsync();
+
+            return Ok("Dirección eliminada correctamente.");
+        }
+
+        // Aquí genero el Id concatenando provincia, cantón y parroquia en el orden en que aparecen
+        private async Task<int> GenerarIdAsync(string provincia, string canton, string parroquia)
+        {
+            var provincias = await _context.Direcciones
+                .Select(d => d.Provincia)
+                .Distinct()
+                .OrderBy(p => p)
+                .ToListAsync();
+
+            int provId = provincias.Contains(provincia)
+                ? provincias.IndexOf(provincia) + 1
+                : provincias.Count + 1;
+
+            var cantones = await _context.Direcciones
+                .Where(d => d.Provincia == provincia)
+                .Select(d => d.Canton)
+                .Distinct()
+                .OrderBy(c => c)
+                .ToListAsync();
+
+            int cantId = cantones.Contains(canton)
+                ? cantones.IndexOf(canton) + 1
+                : cantones.Count + 1;
+
+            var parroquias = await _context.Direcciones
+                .Where(d => d.Provincia == provincia && d.Canton == canton)
+                .Select(d => d.Parroquia)
+                .Distinct()
+                .OrderBy(p => p)
+                .ToListAsync();
+
+            int parrId = parroquias.Contains(parroquia)
+                ? parroquias.IndexOf(parroquia) + 1
+                : parroquias.Count + 1;
+
+            return int.Parse($"{provId:D2}{cantId:D2}{parrId:D2}");
         }
     }
 }

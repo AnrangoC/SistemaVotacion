@@ -22,7 +22,7 @@ namespace SistemaVotoModelos
         public int RolId { get; set; }
         public bool Estado { get; set; } = true;
         public bool HaVotado { get; set; } = false;
-        // Relación con Junta (solo si pertenece a una)
+        // Relación con Junta
         public int? JuntaId { get; set; }
         public Junta? Junta { get; set; }
     }
