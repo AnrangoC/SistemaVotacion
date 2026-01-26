@@ -8,7 +8,6 @@ namespace SistemaVotoMVC.Controllers
         {
            return View();
         }
-
         //public IActionResult Acceder()
         //{
         //    return RedirectToAction("Login", "Aut");

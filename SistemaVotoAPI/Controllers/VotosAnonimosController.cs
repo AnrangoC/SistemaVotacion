@@ -21,7 +21,6 @@ namespace SistemaVotoAPI.Controllers
         }
 
         // GET: api/VotosAnonimos
-        //
         // Este endpoint es solo para uso administrativo y reportes
         // NO debe usarse para exponer votos individualmente al público
         [HttpGet]
@@ -31,7 +30,6 @@ namespace SistemaVotoAPI.Controllers
         }
 
         // POST: api/VotosAnonimos
-        //
         // Registra un voto anónimo
         // No se guarda información del votante
         // El vínculo con el votante se rompe aquí
@@ -40,9 +38,9 @@ namespace SistemaVotoAPI.Controllers
         {
             /*
              Validaciones mínimas obligatorias:
-             - Elección válida
-             - Dirección válida
-             - Número de mesa válido
+              Elección válida
+              Dirección válida
+              Número de mesa válido
             */
 
             bool eleccionExiste = await _context.Elecciones
@@ -60,16 +58,8 @@ namespace SistemaVotoAPI.Controllers
         }
 
         /*
-         IMPORTANTE:
-         NO se implementan:
-         - PUT
-         - DELETE
-         - GET por ID
-
-         Un voto:
-         - No se edita
-         - No se elimina
-         - No se identifica individualmente
+         El voto solo se crea no se puede ni editar ni eliminar y no se tiene que almacenar con un id del votante
+         
         */
     }
 }

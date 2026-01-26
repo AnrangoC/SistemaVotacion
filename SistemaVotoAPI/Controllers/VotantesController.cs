@@ -63,7 +63,7 @@ namespace SistemaVotoAPI.Controllers
                 return BadRequest("Rol inválido.");
 
             /*
-             Lógica de negocio:
+             Lógica de negocio
              Un candidato no puede ser creado como administrador ni jefe de junta
             */
             if (votante.RolId == 1 || votante.RolId == 3)
@@ -76,7 +76,7 @@ namespace SistemaVotoAPI.Controllers
             }
 
             /*
-             Lógica de consistencia:
+             Lógica de consistencia
              Si se envía una junta, debe existir
             */
             if (votante.JuntaId.HasValue)
@@ -89,13 +89,13 @@ namespace SistemaVotoAPI.Controllers
             }
 
             /*
-             Lógica de seguridad:
+             Lógica de seguridad
              La contraseña se almacena siempre como hash
             */
             votante.Password = PasswordHasher.Hash(votante.Password);
 
             /*
-             Lógica de estado inicial:
+             Lógica de estado inicial
              Todo votante se registra activo y sin haber votado
             */
             votante.Estado = true;
@@ -120,7 +120,7 @@ namespace SistemaVotoAPI.Controllers
                 return NotFound();
 
             /*
-             Lógica de negocio:
+             Lógica de negocio
              No se permite asignar rol de administrador o jefe de junta
              a una persona que ya es candidata
             */
@@ -142,7 +142,7 @@ namespace SistemaVotoAPI.Controllers
             existente.JuntaId = votante.JuntaId;
 
             /*
-             Lógica de seguridad:
+             Lógica de seguridad
              Solo se vuelve a hashear la contraseña si se envía una nueva
             */
             if (!string.IsNullOrWhiteSpace(votante.Password))

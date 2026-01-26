@@ -19,7 +19,7 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // Yo aquí devuelvo los candidatos de una elección con su info de votante y lista.
+        // Aquí devuelvo los candidatos de una elección con su info de votante y lista.
         [HttpGet("PorEleccion/{eleccionId:int}")]
         public async Task<IActionResult> PorEleccion(int eleccionId)
         {
@@ -38,7 +38,7 @@ namespace SistemaVotoAPI.Controllers
             return Ok(lista);
         }
 
-        // Yo aquí creo un candidato solo si la elección está en CONFIGURACION y el votante es válido (no admin/jefe).
+        // aquí creo un candidato solo si la elección está en CONFIGURACION y el votante es válido (no admin/jefe).
         [HttpPost]
         public async Task<IActionResult> Crear([FromBody] Candidato candidato)
         {
@@ -102,7 +102,7 @@ namespace SistemaVotoAPI.Controllers
             return CreatedAtAction(nameof(PorEleccion), new { eleccionId = nuevo.EleccionId }, nuevo);
         }
 
-        // Yo aquí permito editar solo ListaId y RolPostulante (no dejo tocar cédula ni elección).
+        // Aquí permito editar solo ListaId y RolPostulante (no dejo tocar cédula ni elección).
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Editar(int id, [FromBody] Candidato cambios)
         {
@@ -141,7 +141,7 @@ namespace SistemaVotoAPI.Controllers
             return NoContent();
         }
 
-        // Yo aquí elimino la postulación, pero bloqueo si la elección ya no está en CONFIGURACION.
+        // Aquí elimino la postulación, pero bloqueo si la elección ya no está en CONFIGURACION.
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Eliminar(int id)
         {

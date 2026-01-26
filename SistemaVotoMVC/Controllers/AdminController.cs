@@ -20,16 +20,14 @@ namespace SistemaVotoMVC.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
+        // PANEL PRINCIPAL
         [HttpGet]
         public IActionResult Main()
         {
             ViewBag.NombreAdmin = User.Identity?.Name ?? "Administrador";
             return View();
         }
-
-        // =========================
-        // VOTANTES (ya lo tenías)
-        // =========================
+        // VOTANTES
         [HttpGet]
         public async Task<IActionResult> GestionVotantes()
         {
@@ -53,7 +51,7 @@ namespace SistemaVotoMVC.Controllers
             if (v == null)
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction("GestionVotantes");
+                return RedirectToAction(nameof(GestionVotantes));
             }
 
             v.Cedula = (v.Cedula ?? "").Trim();
@@ -61,9 +59,11 @@ namespace SistemaVotoMVC.Controllers
             v.Email = (v.Email ?? "").Trim();
             v.FotoUrl = (v.FotoUrl ?? "").Trim();
 
+            // Si Rol 2, no requiere contraseña (tu API la hashea igual; mandamos vacío)
             if (v.RolId == 2)
                 v.Password = "";
 
+            // JuntaId inválida => null
             if (v.JuntaId.HasValue && v.JuntaId.Value <= 0)
                 v.JuntaId = null;
 
@@ -73,13 +73,13 @@ namespace SistemaVotoMVC.Controllers
             if (response.IsSuccessStatusCode)
             {
                 TempData["Mensaje"] = "Usuario creado exitosamente.";
-                return RedirectToAction("GestionVotantes");
+                return RedirectToAction(nameof(GestionVotantes));
             }
 
             var apiMsg = await response.Content.ReadAsStringAsync();
             TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo crear el usuario." : apiMsg;
 
-            return RedirectToAction("GestionVotantes");
+            return RedirectToAction(nameof(GestionVotantes));
         }
 
         [HttpPost]
@@ -89,7 +89,7 @@ namespace SistemaVotoMVC.Controllers
             if (v == null || string.IsNullOrWhiteSpace(v.Cedula))
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction("GestionVotantes");
+                return RedirectToAction(nameof(GestionVotantes));
             }
 
             v.Cedula = v.Cedula.Trim();
@@ -97,6 +97,7 @@ namespace SistemaVotoMVC.Controllers
             v.Email = (v.Email ?? "").Trim();
             v.FotoUrl = (v.FotoUrl ?? "").Trim();
 
+            // Si Rol 2 y no envían password, mando vacío
             if (v.RolId == 2 && string.IsNullOrWhiteSpace(v.Password))
                 v.Password = "";
 
@@ -111,10 +112,12 @@ namespace SistemaVotoMVC.Controllers
             else
             {
                 var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "Error al intentar actualizar el usuario." : apiMsg;
+                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg)
+                    ? "Error al intentar actualizar el usuario."
+                    : apiMsg;
             }
 
-            return RedirectToAction("GestionVotantes");
+            return RedirectToAction(nameof(GestionVotantes));
         }
 
         [HttpPost]
@@ -124,7 +127,7 @@ namespace SistemaVotoMVC.Controllers
             if (string.IsNullOrWhiteSpace(cedula))
             {
                 TempData["Error"] = "Cédula inválida.";
-                return RedirectToAction("GestionVotantes");
+                return RedirectToAction(nameof(GestionVotantes));
             }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
@@ -135,15 +138,15 @@ namespace SistemaVotoMVC.Controllers
             else
             {
                 var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo eliminar el registro." : apiMsg;
+                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg)
+                    ? "No se pudo eliminar el registro."
+                    : apiMsg;
             }
 
-            return RedirectToAction("GestionVotantes");
+            return RedirectToAction(nameof(GestionVotantes));
         }
-
-        // =========================
-        // ELECCIONES
-        // =========================
+        // ELECCIONES (Estado automático en API)
+        
         [HttpGet]
         public async Task<IActionResult> GestionElecciones()
         {
@@ -167,12 +170,13 @@ namespace SistemaVotoMVC.Controllers
             if (e == null || string.IsNullOrWhiteSpace(e.Titulo))
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction("GestionElecciones");
+                return RedirectToAction(nameof(GestionElecciones));
             }
 
             e.Titulo = e.Titulo.Trim();
-            if (string.IsNullOrWhiteSpace(e.Estado))
-                e.Estado = "CONFIGURACION";
+
+            // IMPORTANTE: el Estado lo define la API
+            e.Estado = "";
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
             var response = await client.PostAsJsonAsync(_endpointElecciones, e);
@@ -185,7 +189,7 @@ namespace SistemaVotoMVC.Controllers
                 TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo crear la elección." : apiMsg;
             }
 
-            return RedirectToAction("GestionElecciones");
+            return RedirectToAction(nameof(GestionElecciones));
         }
 
         [HttpPost]
@@ -195,11 +199,13 @@ namespace SistemaVotoMVC.Controllers
             if (e == null || e.Id <= 0)
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction("GestionElecciones");
+                return RedirectToAction(nameof(GestionElecciones));
             }
 
             e.Titulo = (e.Titulo ?? "").Trim();
-            e.Estado = (e.Estado ?? "CONFIGURACION").Trim();
+
+            // IMPORTANTE: el Estado lo define la API
+            e.Estado = "";
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
             var response = await client.PutAsJsonAsync($"{_endpointElecciones}/{e.Id}", e);
@@ -212,7 +218,7 @@ namespace SistemaVotoMVC.Controllers
                 TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo actualizar la elección." : apiMsg;
             }
 
-            return RedirectToAction("GestionElecciones");
+            return RedirectToAction(nameof(GestionElecciones));
         }
 
         [HttpPost]
@@ -222,7 +228,7 @@ namespace SistemaVotoMVC.Controllers
             if (id <= 0)
             {
                 TempData["Error"] = "Id inválido.";
-                return RedirectToAction("GestionElecciones");
+                return RedirectToAction(nameof(GestionElecciones));
             }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
@@ -236,26 +242,28 @@ namespace SistemaVotoMVC.Controllers
                 TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo eliminar la elección." : apiMsg;
             }
 
-            return RedirectToAction("GestionElecciones");
+            return RedirectToAction(nameof(GestionElecciones));
         }
-
-        // =========================
         // LISTAS (por elección)
-        // =========================
         [HttpGet]
         public async Task<IActionResult> GestionListas(int eleccionId)
         {
+            if (eleccionId <= 0)
+            {
+                TempData["Error"] = "Elección inválida.";
+                return RedirectToAction(nameof(GestionElecciones));
+            }
+
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
             var respEleccion = await client.GetAsync($"{_endpointElecciones}/{eleccionId}");
             if (!respEleccion.IsSuccessStatusCode)
             {
                 TempData["Error"] = "Elección no encontrada.";
-                return RedirectToAction("GestionElecciones");
+                return RedirectToAction(nameof(GestionElecciones));
             }
 
-            var eleccion = await respEleccion.Content.ReadFromJsonAsync<Eleccion>();
-            ViewBag.Eleccion = eleccion;
+            ViewBag.Eleccion = await respEleccion.Content.ReadFromJsonAsync<Eleccion>();
 
             var respListas = await client.GetAsync($"{_endpointListas}/PorEleccion/{eleccionId}");
             var listas = respListas.IsSuccessStatusCode
@@ -275,7 +283,7 @@ namespace SistemaVotoMVC.Controllers
             if (l == null || l.EleccionId <= 0 || string.IsNullOrWhiteSpace(l.NombreLista))
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction("GestionElecciones");
+                return RedirectToAction(nameof(GestionElecciones));
             }
 
             l.NombreLista = l.NombreLista.Trim();
@@ -292,7 +300,7 @@ namespace SistemaVotoMVC.Controllers
                 TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo crear la lista." : apiMsg;
             }
 
-            return RedirectToAction("GestionListas", new { eleccionId = l.EleccionId });
+            return RedirectToAction(nameof(GestionListas), new { eleccionId = l.EleccionId });
         }
 
         [HttpPost]
@@ -302,7 +310,7 @@ namespace SistemaVotoMVC.Controllers
             if (l == null || l.Id <= 0 || l.EleccionId <= 0)
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction("GestionElecciones");
+                return RedirectToAction(nameof(GestionElecciones));
             }
 
             l.NombreLista = (l.NombreLista ?? "").Trim();
@@ -319,7 +327,7 @@ namespace SistemaVotoMVC.Controllers
                 TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo actualizar la lista." : apiMsg;
             }
 
-            return RedirectToAction("GestionListas", new { eleccionId = l.EleccionId });
+            return RedirectToAction(nameof(GestionListas), new { eleccionId = l.EleccionId });
         }
 
         [HttpPost]
@@ -329,7 +337,7 @@ namespace SistemaVotoMVC.Controllers
             if (id <= 0 || eleccionId <= 0)
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction("GestionElecciones");
+                return RedirectToAction(nameof(GestionElecciones));
             }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
@@ -343,28 +351,32 @@ namespace SistemaVotoMVC.Controllers
                 TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo eliminar la lista." : apiMsg;
             }
 
-            return RedirectToAction("GestionListas", new { eleccionId });
+            return RedirectToAction(nameof(GestionListas), new { eleccionId });
         }
 
-        // =========================
         // CANDIDATOS (por elección)
-        // =========================
+
         [HttpGet]
         public async Task<IActionResult> GestionCandidatos(int eleccionId)
         {
+            if (eleccionId <= 0)
+            {
+                TempData["Error"] = "Elección inválida.";
+                return RedirectToAction(nameof(GestionElecciones));
+            }
+
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
             var respEleccion = await client.GetAsync($"{_endpointElecciones}/{eleccionId}");
             if (!respEleccion.IsSuccessStatusCode)
             {
                 TempData["Error"] = "Elección no encontrada.";
-                return RedirectToAction("GestionElecciones");
+                return RedirectToAction(nameof(GestionElecciones));
             }
 
-            var eleccion = await respEleccion.Content.ReadFromJsonAsync<Eleccion>();
-            ViewBag.Eleccion = eleccion;
+            ViewBag.Eleccion = await respEleccion.Content.ReadFromJsonAsync<Eleccion>();
 
-            // listas para el dropdown
+            // Listas para dropdown
             var respListas = await client.GetAsync($"{_endpointListas}/PorEleccion/{eleccionId}");
             var listas = respListas.IsSuccessStatusCode
                 ? await respListas.Content.ReadFromJsonAsync<List<Lista>>() ?? new List<Lista>()
@@ -372,7 +384,7 @@ namespace SistemaVotoMVC.Controllers
 
             ViewBag.Listas = listas;
 
-            // candidatos de esa elección
+            // Candidatos por elección
             var respCand = await client.GetAsync($"{_endpointCandidatos}/PorEleccion/{eleccionId}");
             var candidatos = respCand.IsSuccessStatusCode
                 ? await respCand.Content.ReadFromJsonAsync<List<Candidato>>() ?? new List<Candidato>()
@@ -388,17 +400,18 @@ namespace SistemaVotoMVC.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CrearCandidato(Candidato c)
         {
-            if (c == null || c.EleccionId <= 0 || c.ListaId <= 0 || string.IsNullOrWhiteSpace(c.Cedula) || string.IsNullOrWhiteSpace(c.RolPostulante))
+            if (c == null || c.EleccionId <= 0 || c.ListaId <= 0 ||
+                string.IsNullOrWhiteSpace(c.Cedula) || string.IsNullOrWhiteSpace(c.RolPostulante))
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction("GestionElecciones");
+                return RedirectToAction(nameof(GestionElecciones));
             }
 
             c.Cedula = c.Cedula.Trim();
             c.RolPostulante = c.RolPostulante.Trim();
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
-            var response = await client.PostAsJsonAsync($"{_endpointCandidatos}", c);
+            var response = await client.PostAsJsonAsync(_endpointCandidatos, c);
 
             if (response.IsSuccessStatusCode)
                 TempData["Mensaje"] = "Candidato registrado.";
@@ -408,7 +421,7 @@ namespace SistemaVotoMVC.Controllers
                 TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo crear el candidato." : apiMsg;
             }
 
-            return RedirectToAction("GestionCandidatos", new { eleccionId = c.EleccionId });
+            return RedirectToAction(nameof(GestionCandidatos), new { eleccionId = c.EleccionId });
         }
 
         [HttpPost]
@@ -418,13 +431,13 @@ namespace SistemaVotoMVC.Controllers
             if (id <= 0 || eleccionId <= 0 || listaId <= 0 || string.IsNullOrWhiteSpace(rolPostulante))
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction("GestionCandidatos", new { eleccionId });
+                return RedirectToAction(nameof(GestionCandidatos), new { eleccionId });
             }
 
             var cambios = new Candidato
             {
                 Id = id,
-                EleccionId = eleccionId,   // la API no lo edita, pero lo mando por consistencia
+                EleccionId = eleccionId,
                 ListaId = listaId,
                 RolPostulante = rolPostulante.Trim()
             };
@@ -440,7 +453,7 @@ namespace SistemaVotoMVC.Controllers
                 TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo actualizar el candidato." : apiMsg;
             }
 
-            return RedirectToAction("GestionCandidatos", new { eleccionId });
+            return RedirectToAction(nameof(GestionCandidatos), new { eleccionId });
         }
 
         [HttpPost]
@@ -450,7 +463,7 @@ namespace SistemaVotoMVC.Controllers
             if (id <= 0 || eleccionId <= 0)
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction("GestionCandidatos", new { eleccionId });
+                return RedirectToAction(nameof(GestionCandidatos), new { eleccionId });
             }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
@@ -464,8 +477,8 @@ namespace SistemaVotoMVC.Controllers
                 TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo eliminar el candidato." : apiMsg;
             }
 
-            return RedirectToAction("GestionCandidatos", new { eleccionId });
+            return RedirectToAction(nameof(GestionCandidatos), new { eleccionId });
         }
-
     }
 }
+

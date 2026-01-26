@@ -52,7 +52,7 @@ namespace SistemaVotoMVC.Controllers
                 return View(model);
             }
 
-            // Solo admin (1) y jefe de junta (3) deberían llegar aquí, pero igual lo dejo seguro
+            // Solo admin (1) y jefe de junta (3) deberían llegar aquí, pero igual queda seguro
             if (usuario.RolId != 1 && usuario.RolId != 3)
             {
                 ModelState.AddModelError("", "No tienes permisos para ingresar al panel de gestión.");

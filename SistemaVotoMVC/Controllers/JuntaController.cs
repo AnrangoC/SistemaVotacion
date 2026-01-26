@@ -29,12 +29,11 @@ namespace SistemaVotoMVC.Controllers
             int juntaId = int.Parse(juntaClaim);
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
-            // --- SECCIÓN: LLAMADA A LA API ---
             // 1. Pedimos los detalles de la Junta (Dirección, Mesa, etc.)
             var responseJunta = await client.GetAsync($"api/Juntas/{juntaId}");
 
             // 2. Pedimos la lista de votantes que pertenecen a esta junta específica
-            // Usamos el endpoint que ya tienes configurado en tu VotantesController
+            // Usamos el endpoint que ya tenemosguarado en VotantesController
             var responseVotantes = await client.GetAsync($"api/Votantes/Junta/{juntaId}");
 
             if (responseJunta.IsSuccessStatusCode && responseVotantes.IsSuccessStatusCode)
@@ -46,7 +45,6 @@ namespace SistemaVotoMVC.Controllers
                 var votantes = await responseVotantes.Content.ReadFromJsonAsync<List<object>>();
                 return View(votantes);
             }
-
             // Si algo falla, mandamos una lista vacía para evitar errores en la vista
             return View(new List<object>());
         }
