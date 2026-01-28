@@ -1,0 +1,57 @@
+﻿@using SistemaVotoModelos
+@model IEnumerable<Votante>
+
+@{
+    ViewData["Title"] = "Votantes de la Junta";
+    int juntaId = ViewBag.JuntaId ?? 0;
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="fw-bold mb-0">Votantes de la junta @juntaId</h3>
+        <small class="text-muted">Lista de ciudadanos asignados a esta junta.</small>
+    </div>
+
+    <a asp-controller="Juntas" asp-action="Index" class="btn btn-outline-secondary">
+        Volver
+    </a>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Cédula</th>
+                        <th>Nombre</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model == null || !Model.Any())
+                    {
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">
+                                No hay votantes asignados a esta junta.
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        foreach (var v in Model)
+                        {
+                            <tr>
+                                <td>@v.Cedula</td>
+                                <td>@v.NombreCompleto</td>
+                                <td>@v.Email</td>
+                                <td>@v.RolId</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

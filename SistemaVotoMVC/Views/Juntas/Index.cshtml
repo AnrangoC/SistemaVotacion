@@ -1,0 +1,119 @@
+﻿@model IEnumerable<SistemaVotoModelos.DTOs.JuntaDetalleDto>
+
+@{
+    ViewData["Title"] = "Gestión de Juntas";
+    var direcciones = ViewBag.Direcciones as List<SistemaVotoModelos.Direccion> ?? new List<SistemaVotoModelos.Direccion>();
+    var elecciones = ViewBag.Elecciones as List<SistemaVotoModelos.Eleccion> ?? new List<SistemaVotoModelos.Eleccion>();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h3 class="fw-bold mb-0">Gestión de Juntas</h3>
+        <small class="text-muted">
+            Estados Junta: 1 Cerrada, 2 Abierta, 3 Pendiente de aprobación, 4 Aprobada
+        </small>
+    </div>
+
+    <button class="btn btn-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#modalCrearJuntas">
+        Crear juntas
+    </button>
+</div>
+
+@if (TempData["Mensaje"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show">
+        @TempData["Mensaje"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show">
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Id</th>
+                        <th>Mesa</th>
+                        <th>Ubicación</th>
+                        <th>Jefe</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model == null || !Model.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                No hay juntas registradas
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        foreach (var j in Model)
+                        {
+                            <tr>
+                                <td>@j.Id</td>
+                                <td>@j.NumeroMesa</td>
+                                <td>@j.Ubicacion</td>
+                                <td>@j.NombreJefe</td>
+                                <td>@j.EstadoJunta</td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modalCrearJuntas" tabindex="-1">
+    <div class="modal-dialog">
+        <form asp-controller="Juntas" asp-action="CrearPorDireccion" method="post" class="modal-content">
+            @Html.AntiForgeryToken()
+
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Crear juntas por dirección</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+                <label class="fw-bold">Elección</label>
+                <select name="eleccionId" class="form-select mb-3" required>
+                    <option value="">Selecciona una elección</option>
+                    @foreach (var e in elecciones)
+                    {
+                        <option value="@e.Id">@e.Titulo</option>
+                    }
+                </select>
+
+                <label class="fw-bold">Dirección</label>
+                <select name="direccionId" class="form-select mb-3" required>
+                    <option value="">Selecciona una dirección</option>
+                    @foreach (var d in direcciones)
+                    {
+                        <option value="@d.Id">@d.Provincia - @d.Canton - @d.Parroquia</option>
+                    }
+                </select>
+
+                <label class="fw-bold">Cantidad de juntas</label>
+                <input name="cantidad" type="number" class="form-control" min="1" required />
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-primary w-100" type="submit">Crear</button>
+            </div>
+        </form>
+    </div>
+</div>

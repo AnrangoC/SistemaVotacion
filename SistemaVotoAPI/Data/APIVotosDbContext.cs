@@ -37,27 +37,11 @@ namespace SistemaVotoAPI.Data
             modelBuilder.Entity<Direccion>()
                 .HasKey(d => d.Id);
 
-            // JUNTA
-            modelBuilder.Entity<Junta>()
-                .HasKey(j => j.Id);
-
-            modelBuilder.Entity<Junta>()
-                .HasOne(j => j.Direccion)
-                .WithMany()
-                .HasForeignKey(j => j.DireccionId)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            modelBuilder.Entity<Junta>()
-                .HasOne(j => j.JefeDeJunta)
-                .WithMany()
-                .HasForeignKey(j => j.JefeDeJuntaId)
-                .OnDelete(DeleteBehavior.Restrict);
-
             // ELECCION
             modelBuilder.Entity<Eleccion>()
                 .HasKey(e => e.Id);
 
-            // LISTA -> ELECCION
+            // LISTA
             modelBuilder.Entity<Lista>()
                 .HasKey(l => l.Id);
 
@@ -67,7 +51,7 @@ namespace SistemaVotoAPI.Data
                 .HasForeignKey(l => l.EleccionId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // CANDIDATO (tabla propia)
+            // CANDIDATO
             modelBuilder.Entity<Candidato>()
                 .HasKey(c => c.Id);
 
@@ -89,9 +73,39 @@ namespace SistemaVotoAPI.Data
                 .HasForeignKey(c => c.ListaId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Un votante no puede ser candidato 2 veces en la misma elección
             modelBuilder.Entity<Candidato>()
                 .HasIndex(c => new { c.Cedula, c.EleccionId })
+                .IsUnique();
+
+            // JUNTA
+            modelBuilder.Entity<Junta>()
+                .HasKey(j => j.Id);
+
+            modelBuilder.Entity<Junta>()
+                .Property(j => j.Id)
+                .ValueGeneratedOnAdd(); // Para que el Id sea autogenerado
+
+            modelBuilder.Entity<Junta>()
+                .HasOne(j => j.Direccion)
+                .WithMany()
+                .HasForeignKey(j => j.DireccionId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Junta>()
+                .HasOne(j => j.JefeDeJunta)
+                .WithMany()
+                .HasForeignKey(j => j.JefeDeJuntaId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Junta>()
+                .HasOne(j => j.Eleccion)
+                .WithMany()
+                .HasForeignKey(j => j.EleccionId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Esto permite repetir la misma mesa en otra elección sin chocar
+            modelBuilder.Entity<Junta>()
+                .HasIndex(j => new { j.EleccionId, j.DireccionId, j.NumeroMesa })
                 .IsUnique();
 
             // TOKEN ACCESO

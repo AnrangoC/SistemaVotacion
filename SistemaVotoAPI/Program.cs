@@ -6,10 +6,36 @@ using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using System;
 
+// Nuevo
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using System.IO;
+
 // Configuración global para compatibilidad con fechas en PostgreSQL
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Nuevo
+// Cookies compartidas con MVC (llaves dentro de la solución)
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(
+        new DirectoryInfo(
+            Path.Combine(builder.Environment.ContentRootPath, "..", "SharedKeys")
+        )
+    )
+    .SetApplicationName("SistemaVotoApp");
+
+// Nuevo
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "SistemaVotoAuth";
+        options.SlidingExpiration = true;
+    });
+
+// Nuevo
+builder.Services.AddAuthorization();
 
 // Configuración de la base de datos
 // La API soporta múltiples entornos:
@@ -71,36 +97,13 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
-// Inicialización de la base de datos
-// En esta fase se fuerza la recreación del esquema
-// Esto garantiza que todas las tablas se creen correctamente
-// Este bloque es temporal mientras la base está vacía
-
-//using (var scope = app.Services.CreateScope())
-//{
-//    var services = scope.ServiceProvider;
-
-//    try
-//    {
-//        var context = services.GetRequiredService<APIVotosDbContext>();
-
-//        // Temporal para desarrollo inicial
-//        context.Database.EnsureDeleted();
-//        context.Database.EnsureCreated();
-
-//        Console.WriteLine(
-//            $"Base de datos inicializada correctamente: {context.Database.GetDbConnection().Database}"
-//        );
-//    }
-//    catch (Exception ex)
-//    {
-//        Console.WriteLine("Error al inicializar la base de datos: " + ex.Message);
-//    }
-//}
-
 // Pipeline final de la aplicación
 
 app.UseHttpsRedirection();
+
+// Nuevo
+app.UseAuthentication();
+
 app.UseAuthorization();
 app.MapControllers();
 app.Run();

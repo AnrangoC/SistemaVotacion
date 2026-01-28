@@ -1,7 +1,10 @@
 ﻿@model IEnumerable<SistemaVotoModelos.Votante>
+@using SistemaVotoModelos.DTOs
 
 @{
     ViewData["Title"] = "Gestión de Usuarios";
+
+    var juntas = ViewBag.Juntas as List<JuntaDetalleDto> ?? new List<JuntaDetalleDto>();
 }
 
 <div class="container mt-4">
@@ -23,17 +26,15 @@
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-            <h4 class="fw-bold mb-0">👥 Gestión de Usuarios</h4>
+            <h4 class="fw-bold mb-0">Gestión de Usuarios</h4>
             <small class="text-muted">Administración del padrón electoral</small>
         </div>
 
         <div class="d-flex gap-2">
-            <a asp-action="Main" class="btn btn-outline-secondary">
-                <i class="bi bi-arrow-left"></i> Volver
-            </a>
+            <a asp-action="Main" class="btn btn-outline-secondary">Volver</a>
 
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalNuevo">
-                <i class="bi bi-plus-circle"></i> Registrar Nuevo
+                Registrar Nuevo
             </button>
         </div>
     </div>
@@ -44,7 +45,7 @@
             <div class="row g-2 mb-3">
                 <div class="col-md-6">
                     <div class="input-group">
-                        <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                        <span class="input-group-text bg-light">Buscar</span>
                         <input id="buscador" class="form-control" placeholder="Buscar por cédula o nombre..." onkeyup="filtrarTabla()" />
                     </div>
                 </div>
@@ -64,12 +65,29 @@
                             <th>Nombre</th>
                             <th>Email</th>
                             <th style="width: 130px;">Rol</th>
+                            <th style="width: 320px;">Junta</th>
                             <th style="width: 150px;">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var v in Model)
                         {
+                            string juntaTexto = "Sin junta";
+
+                            if (v.JuntaId.HasValue)
+                            {
+                                var j = juntas.FirstOrDefault(x => x.Id == v.JuntaId.Value);
+
+                                if (j != null)
+                                {
+                                    juntaTexto = $"Mesa {j.NumeroMesa} - {j.Ubicacion}";
+                                }
+                                else
+                                {
+                                    juntaTexto = $"Junta #{v.JuntaId.Value}";
+                                }
+                            }
+
                             <tr class="fila-usuario">
                                 <td class="col-cedula">@v.Cedula</td>
                                 <td class="col-nombre">@v.NombreCompleto</td>
@@ -88,19 +106,20 @@
                                         <span class="badge bg-primary">Votante</span>
                                     }
                                 </td>
+                                <td><span class="text-muted">@juntaTexto</span></td>
 
                                 <td class="d-flex gap-2">
                                     <button type="button"
                                             class="btn btn-sm btn-outline-info"
                                             onclick="abrirEditar(
                                                     '@v.Cedula',
-                                                    '@v.NombreCompleto',
-                                                    '@v.Email',
+                                                    '@Html.Raw((v.NombreCompleto ?? "").Replace("'", "\\'"))',
+                                                    '@Html.Raw((v.Email ?? "").Replace("'", "\\'"))',
                                                     '@v.RolId',
                                                     '@(v.JuntaId?.ToString() ?? "")',
-                                                    '@v.FotoUrl'
+                                                    '@Html.Raw((v.FotoUrl ?? "").Replace("'", "\\'"))'
                                                 )">
-                                        <i class="bi bi-pencil-square"></i>
+                                        Editar
                                     </button>
 
                                     <form asp-action="EliminarVotante" method="post" class="d-inline">
@@ -109,7 +128,7 @@
                                         <button type="submit"
                                                 class="btn btn-sm btn-outline-danger"
                                                 onclick="return confirm('¿Eliminar a @v.NombreCompleto?')">
-                                            <i class="bi bi-trash"></i>
+                                            Eliminar
                                         </button>
                                     </form>
                                 </td>
@@ -123,21 +142,20 @@
     </div>
 </div>
 
-<!-- MODAL NUEVO -->
 <div class="modal fade" id="modalNuevo" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <form asp-action="CrearVotante" method="post" class="modal-content shadow border-0">
             @Html.AntiForgeryToken()
 
             <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title"><i class="bi bi-person-plus"></i> Nuevo Usuario</h5>
+                <h5 class="modal-title">Nuevo Usuario</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
 
             <div class="modal-body">
                 <label class="fw-bold">Rol</label>
-                <select name="RolId" class="form-select mb-3" onchange="togglePassword(this.value)">
-                    <option value="2">Votante (Ciudadano)</option>
+                <select name="RolId" id="nuevoRol" class="form-select mb-3" onchange="onRolNuevoChange()">
+                    <option value="2">Votante</option>
                     <option value="3">Jefe de Junta</option>
                     <option value="1">Administrador</option>
                 </select>
@@ -151,16 +169,22 @@
                 <label class="fw-bold">Email</label>
                 <input name="Email" type="email" class="form-control mb-3" required />
 
-                <label class="fw-bold">Junta (opcional)</label>
-                <input name="JuntaId" type="number" class="form-control mb-3" placeholder="Ej: 10010101" />
+                <label class="fw-bold">Junta</label>
+                <select name="JuntaId" id="nuevoJuntaId" class="form-select mb-3" disabled>
+                    <option value="">Sin junta</option>
+                    @foreach (var j in juntas)
+                    {
+                        <option value="@j.Id">Mesa @j.NumeroMesa - @j.Ubicacion</option>
+                    }
+                </select>
+                <small class="text-muted d-block mb-3">Para Jefe de Junta se debe escoger una junta.</small>
 
-                <label class="fw-bold">Foto URL (opcional)</label>
+                <label class="fw-bold">Foto URL</label>
                 <input name="FotoUrl" class="form-control mb-3" placeholder="https://..." />
 
                 <label class="fw-bold">Contraseña</label>
-                <input name="Password" id="passInput" type="password"
-                       class="form-control" placeholder="Solo Admin / Jefe Junta" disabled />
-                <small class="text-muted">Para Rol 2 (votante) no se requiere contraseña.</small>
+                <input name="Password" id="nuevoPass" type="password" class="form-control" disabled />
+                <small class="text-muted">La contraseña solo se usa para Admin o Jefe de Junta.</small>
             </div>
 
             <div class="modal-footer">
@@ -170,14 +194,13 @@
     </div>
 </div>
 
-<!-- MODAL EDITAR -->
 <div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <form asp-action="EditarVotante" method="post" class="modal-content shadow border-0">
             @Html.AntiForgeryToken()
 
             <div class="modal-header bg-info text-white">
-                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Editar Usuario</h5>
+                <h5 class="modal-title">Editar Usuario</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
 
@@ -191,20 +214,27 @@
                 <input name="Email" id="editEmail" type="email" class="form-control mb-3" required />
 
                 <label class="fw-bold">Rol</label>
-                <select name="RolId" id="editRol" class="form-select mb-3" onchange="toggleEditPassword(this.value)">
+                <select name="RolId" id="editRol" class="form-select mb-3" onchange="onRolEditChange()">
                     <option value="2">Votante</option>
                     <option value="3">Jefe de Junta</option>
                     <option value="1">Administrador</option>
                 </select>
 
-                <label class="fw-bold">Junta (opcional)</label>
-                <input name="JuntaId" id="editJunta" type="number" class="form-control mb-3" />
+                <label class="fw-bold">Junta</label>
+                <select name="JuntaId" id="editJunta" class="form-select mb-3" disabled>
+                    <option value="">Sin junta</option>
+                    @foreach (var j in juntas)
+                    {
+                        <option value="@j.Id">Mesa @j.NumeroMesa - @j.Ubicacion</option>
+                    }
+                </select>
 
                 <label class="fw-bold">Foto URL</label>
                 <input name="FotoUrl" id="editFoto" class="form-control mb-3" />
 
-                <label class="fw-bold">Nueva contraseña (opcional)</label>
+                <label class="fw-bold">Nueva contraseña</label>
                 <input name="Password" id="editPass" type="password" class="form-control" disabled />
+                <small class="text-muted">Solo aplica para Admin o Jefe de Junta.</small>
             </div>
 
             <div class="modal-footer">
@@ -216,44 +246,61 @@
 
 @section Scripts {
     <script>
-        function togglePassword(rol) {
-            const pass = document.getElementById("passInput");
-            const requiere = (rol === "1" || rol === "3");
-            pass.disabled = !requiere;
-            pass.required = requiere;
-            if (!requiere) pass.value = "";
-        }
-
         function filtrarTabla() {
-            const q = document.getElementById("buscador").value.toLowerCase().trim();
+            const q = (document.getElementById("buscador").value || "").toLowerCase().trim();
             const filas = document.querySelectorAll(".fila-usuario");
 
             filas.forEach(f => {
-                const ced = f.querySelector(".col-cedula").innerText.toLowerCase();
-                const nom = f.querySelector(".col-nombre").innerText.toLowerCase();
+                const ced = (f.querySelector(".col-cedula")?.innerText || "").toLowerCase();
+                const nom = (f.querySelector(".col-nombre")?.innerText || "").toLowerCase();
                 f.style.display = (ced.includes(q) || nom.includes(q)) ? "" : "none";
             });
         }
 
-        function abrirEditar(ced, nombre, email, rol, junta, foto) {
-            document.getElementById("editCedula").value = ced;
-            document.getElementById("editNombre").value = nombre;
-            document.getElementById("editEmail").value = email;
-            document.getElementById("editRol").value = rol;
-            document.getElementById("editJunta").value = junta || "";
-            document.getElementById("editFoto").value = foto || "";
+        function onRolNuevoChange() {
+            const rol = document.getElementById("nuevoRol").value;
+            const pass = document.getElementById("nuevoPass");
+            const junta = document.getElementById("nuevoJuntaId");
 
-            toggleEditPassword(rol);
+            const requierePass = (rol === "1" || rol === "3");
+            pass.disabled = !requierePass;
+            if (!requierePass) pass.value = "";
+
+            const requiereJunta = (rol === "3");
+            junta.disabled = !requiereJunta;
+            if (!requiereJunta) junta.value = "";
+        }
+
+        function onRolEditChange() {
+            const rol = document.getElementById("editRol").value;
+            const pass = document.getElementById("editPass");
+            const junta = document.getElementById("editJunta");
+
+            const requierePass = (rol === "1" || rol === "3");
+            pass.disabled = !requierePass;
+            if (!requierePass) pass.value = "";
+
+            const requiereJunta = (rol === "3");
+            junta.disabled = !requiereJunta;
+            if (!requiereJunta) junta.value = "";
+        }
+
+        function abrirEditar(ced, nombre, email, rol, juntaId, foto) {
+            document.getElementById("editCedula").value = ced;
+            document.getElementById("editNombre").value = nombre || "";
+            document.getElementById("editEmail").value = email || "";
+            document.getElementById("editRol").value = rol || "2";
+            document.getElementById("editJunta").value = juntaId || "";
+            document.getElementById("editFoto").value = foto || "";
+            document.getElementById("editPass").value = "";
+
+            onRolEditChange();
 
             new bootstrap.Modal(document.getElementById("modalEditar")).show();
         }
 
-        function toggleEditPassword(rol) {
-            const pass = document.getElementById("editPass");
-            const requiere = (rol === "1" || rol === "3");
-            pass.disabled = !requiere;
-            pass.required = false;
-            if (!requiere) pass.value = "";
-        }
+        document.addEventListener("DOMContentLoaded", () => {
+            onRolNuevoChange();
+        });
     </script>
 }

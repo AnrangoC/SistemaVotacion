@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SistemaVotoModelos;
+using SistemaVotoModelos.DTOs;
 using System.Net.Http.Json;
 
 namespace SistemaVotoMVC.Controllers
@@ -14,6 +15,7 @@ namespace SistemaVotoMVC.Controllers
         private readonly string _endpointElecciones = "api/Elecciones";
         private readonly string _endpointListas = "api/Listas";
         private readonly string _endpointCandidatos = "api/Candidatos";
+        private readonly string _endpointJuntas = "api/Juntas";
 
         public AdminController(IHttpClientFactory httpClientFactory)
         {
@@ -27,19 +29,31 @@ namespace SistemaVotoMVC.Controllers
             ViewBag.NombreAdmin = User.Identity?.Name ?? "Administrador";
             return View();
         }
+
         // VOTANTES
         [HttpGet]
         public async Task<IActionResult> GestionVotantes()
         {
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
-            var response = await client.GetAsync(_endpointVotantes);
 
+            var response = await client.GetAsync(_endpointVotantes);
             var lista = response.IsSuccessStatusCode
                 ? await response.Content.ReadFromJsonAsync<List<Votante>>() ?? new List<Votante>()
                 : new List<Votante>();
 
             if (!response.IsSuccessStatusCode)
                 TempData["Error"] = "No se pudo obtener la lista de votantes desde la API.";
+
+            // Traer juntas para combo (Id + ubicación)
+            var respJuntas = await client.GetAsync(_endpointJuntas);
+            var juntas = respJuntas.IsSuccessStatusCode
+                ? await respJuntas.Content.ReadFromJsonAsync<List<JuntaDetalleDto>>() ?? new List<JuntaDetalleDto>()
+                : new List<JuntaDetalleDto>();
+
+            if (!respJuntas.IsSuccessStatusCode)
+                TempData["Error"] = "No se pudo obtener juntas desde la API.";
+
+            ViewBag.Juntas = juntas.OrderBy(j => j.Id).ToList();
 
             return View(lista);
         }
@@ -59,7 +73,7 @@ namespace SistemaVotoMVC.Controllers
             v.Email = (v.Email ?? "").Trim();
             v.FotoUrl = (v.FotoUrl ?? "").Trim();
 
-            // Si Rol 2, no requiere contraseña (tu API la hashea igual; mandamos vacío)
+            // Para rol 2 no se exige password
             if (v.RolId == 2)
                 v.Password = "";
 
@@ -145,8 +159,9 @@ namespace SistemaVotoMVC.Controllers
 
             return RedirectToAction(nameof(GestionVotantes));
         }
+
         // ELECCIONES (Estado automático en API)
-        
+
         [HttpGet]
         public async Task<IActionResult> GestionElecciones()
         {
@@ -175,7 +190,7 @@ namespace SistemaVotoMVC.Controllers
 
             e.Titulo = e.Titulo.Trim();
 
-            // IMPORTANTE: el Estado lo define la API
+            // El estado lo define la API
             e.Estado = "";
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
@@ -203,8 +218,6 @@ namespace SistemaVotoMVC.Controllers
             }
 
             e.Titulo = (e.Titulo ?? "").Trim();
-
-            // IMPORTANTE: el Estado lo define la API
             e.Estado = "";
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
@@ -244,7 +257,9 @@ namespace SistemaVotoMVC.Controllers
 
             return RedirectToAction(nameof(GestionElecciones));
         }
+
         // LISTAS (por elección)
+
         [HttpGet]
         public async Task<IActionResult> GestionListas(int eleccionId)
         {
@@ -376,7 +391,6 @@ namespace SistemaVotoMVC.Controllers
 
             ViewBag.Eleccion = await respEleccion.Content.ReadFromJsonAsync<Eleccion>();
 
-            // Listas para dropdown
             var respListas = await client.GetAsync($"{_endpointListas}/PorEleccion/{eleccionId}");
             var listas = respListas.IsSuccessStatusCode
                 ? await respListas.Content.ReadFromJsonAsync<List<Lista>>() ?? new List<Lista>()
@@ -384,7 +398,6 @@ namespace SistemaVotoMVC.Controllers
 
             ViewBag.Listas = listas;
 
-            // Candidatos por elección
             var respCand = await client.GetAsync($"{_endpointCandidatos}/PorEleccion/{eleccionId}");
             var candidatos = respCand.IsSuccessStatusCode
                 ? await respCand.Content.ReadFromJsonAsync<List<Candidato>>() ?? new List<Candidato>()
@@ -481,4 +494,3 @@ namespace SistemaVotoMVC.Controllers
         }
     }
 }
-

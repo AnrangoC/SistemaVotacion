@@ -4,6 +4,7 @@ using SistemaVotoAPI.Data;
 using SistemaVotoModelos;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Controllers
@@ -131,6 +132,23 @@ namespace SistemaVotoAPI.Controllers
             await _context.SaveChangesAsync();
             return NoContent();
         }
+        // GET: api/Elecciones/Activa
+        [HttpGet("Activa")]
+        public async Task<IActionResult> GetEleccionActiva()
+        {
+            var ahora = DateTime.Now;
+
+            var eleccion = await _context.Elecciones
+                .Where(e => e.FechaInicio <= ahora && e.FechaFin >= ahora)
+                .OrderByDescending(e => e.FechaInicio)
+                .FirstOrDefaultAsync();
+
+            if (eleccion == null)
+                return NotFound("No hay una elección activa en este momento.");
+
+            return Ok(eleccion);
+        }
+
     }
 }
 

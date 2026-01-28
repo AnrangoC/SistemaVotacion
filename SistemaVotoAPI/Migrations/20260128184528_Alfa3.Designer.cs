@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using SistemaVotoAPI.Data;
@@ -11,9 +12,11 @@ using SistemaVotoAPI.Data;
 namespace SistemaVotoAPI.Migrations
 {
     [DbContext(typeof(APIVotosDbContext))]
-    partial class APIVotosDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260128184528_Alfa3")]
+    partial class Alfa3
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
