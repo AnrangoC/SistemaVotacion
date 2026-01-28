@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Controllers
 {
-    // Nota: por ahora la seguridad la controla el MVC con cookies y rol 1
+    // Por ahora la seguridad la controla el MVC con cookies y rol 1
     // Luego podemos migrar esto a JWT y volver a activar [Authorize]
     [Route("api/[controller]")]
     [ApiController]
@@ -35,10 +35,19 @@ namespace SistemaVotoAPI.Controllers
                 {
                     Id = j.Id,
                     NumeroMesa = j.NumeroMesa,
-                    Ubicacion = $"{j.Direccion.Provincia} - {j.Direccion.Canton} - {j.Direccion.Parroquia}",
+
+                    // Esto es lo que faltaba para que el MVC no muestre Direccion 0
+                    DireccionId = j.DireccionId,
+                    EleccionId = j.EleccionId,
+
+                    Ubicacion = j.Direccion == null
+                        ? "Sin dirección"
+                        : $"{j.Direccion.Provincia} - {j.Direccion.Canton} - {j.Direccion.Parroquia}",
+
                     NombreJefe = string.IsNullOrWhiteSpace(j.JefeDeJuntaId)
                         ? "Sin asignar"
                         : (j.JefeDeJunta != null ? j.JefeDeJunta.NombreCompleto : "Sin asignar"),
+
                     EstadoJunta = j.Estado
                 })
                 .OrderBy(j => j.Id)
@@ -46,7 +55,6 @@ namespace SistemaVotoAPI.Controllers
 
             return Ok(juntas);
         }
-
 
         [HttpPost("CrearPorDireccion")]
         public async Task<IActionResult> CrearPorDireccion(int eleccionId, int direccionId, int cantidad)
@@ -74,6 +82,7 @@ namespace SistemaVotoAPI.Controllers
             {
                 int numeroMesa = mesasExistentes + i;
 
+                // Id calculado por dirección + número de mesa
                 int juntaId = int.Parse($"{direccion.Id}{numeroMesa:D2}");
 
                 nuevasJuntas.Add(new Junta
@@ -93,7 +102,6 @@ namespace SistemaVotoAPI.Controllers
             return Ok("Juntas creadas correctamente.");
         }
 
-
         [HttpPut("AsignarJefe")]
         public async Task<IActionResult> AsignarJefe(int juntaId, string cedulaVotante)
         {
@@ -110,12 +118,15 @@ namespace SistemaVotoAPI.Controllers
             if (votante == null)
                 return NotFound("El votante no existe");
 
+            // Regla: el jefe debe pertenecer a esa junta
             if (!votante.JuntaId.HasValue || votante.JuntaId.Value != juntaId)
                 return BadRequest("Ese votante no pertenece a esta junta.");
 
+            // Regla: admin no puede ser jefe
             if (votante.RolId == 1)
                 return BadRequest("Un administrador no puede ser jefe de junta.");
 
+            // Regla: candidato no puede ser jefe
             bool esCandidato = await _context.Candidatos.AnyAsync(c => c.Cedula == cedulaVotante);
             if (esCandidato)
                 return BadRequest("Un candidato no puede ser jefe de junta.");

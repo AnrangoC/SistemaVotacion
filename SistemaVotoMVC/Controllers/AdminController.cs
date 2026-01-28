@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SistemaVotoModelos;
-using SistemaVotoModelos.DTOs;
 using System.Net.Http.Json;
 
 namespace SistemaVotoMVC.Controllers
@@ -36,7 +35,9 @@ namespace SistemaVotoMVC.Controllers
         {
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
+            // 1) Votantes
             var response = await client.GetAsync(_endpointVotantes);
+
             var lista = response.IsSuccessStatusCode
                 ? await response.Content.ReadFromJsonAsync<List<Votante>>() ?? new List<Votante>()
                 : new List<Votante>();
@@ -44,19 +45,25 @@ namespace SistemaVotoMVC.Controllers
             if (!response.IsSuccessStatusCode)
                 TempData["Error"] = "No se pudo obtener la lista de votantes desde la API.";
 
-            // Traer juntas para combo (Id + ubicación)
-            var respJuntas = await client.GetAsync(_endpointJuntas);
-            var juntas = respJuntas.IsSuccessStatusCode
-                ? await respJuntas.Content.ReadFromJsonAsync<List<JuntaDetalleDto>>() ?? new List<JuntaDetalleDto>()
-                : new List<JuntaDetalleDto>();
+            // 2) Juntas (para el combo)
+            var respJuntas = await client.GetAsync("api/Juntas");
+            if (respJuntas.IsSuccessStatusCode)
+            {
+                // Usamos el DTO que ya tienes porque trae Ubicacion y DireccionId correctos
+                var juntas = await respJuntas.Content.ReadFromJsonAsync<List<SistemaVotoModelos.DTOs.JuntaDetalleDto>>()
+                            ?? new List<SistemaVotoModelos.DTOs.JuntaDetalleDto>();
 
-            if (!respJuntas.IsSuccessStatusCode)
-                TempData["Error"] = "No se pudo obtener juntas desde la API.";
-
-            ViewBag.Juntas = juntas.OrderBy(j => j.Id).ToList();
+                ViewBag.Juntas = juntas;
+            }
+            else
+            {
+                ViewBag.Juntas = new List<SistemaVotoModelos.DTOs.JuntaDetalleDto>();
+                TempData["ErrorJuntas"] = "No se pudo obtener juntas desde la API.";
+            }
 
             return View(lista);
         }
+
 
         [HttpPost]
         [ValidateAntiForgeryToken]
@@ -73,11 +80,9 @@ namespace SistemaVotoMVC.Controllers
             v.Email = (v.Email ?? "").Trim();
             v.FotoUrl = (v.FotoUrl ?? "").Trim();
 
-            // Para rol 2 no se exige password
             if (v.RolId == 2)
                 v.Password = "";
 
-            // JuntaId inválida => null
             if (v.JuntaId.HasValue && v.JuntaId.Value <= 0)
                 v.JuntaId = null;
 
@@ -111,7 +116,6 @@ namespace SistemaVotoMVC.Controllers
             v.Email = (v.Email ?? "").Trim();
             v.FotoUrl = (v.FotoUrl ?? "").Trim();
 
-            // Si Rol 2 y no envían password, mando vacío
             if (v.RolId == 2 && string.IsNullOrWhiteSpace(v.Password))
                 v.Password = "";
 
@@ -160,8 +164,7 @@ namespace SistemaVotoMVC.Controllers
             return RedirectToAction(nameof(GestionVotantes));
         }
 
-        // ELECCIONES (Estado automático en API)
-
+        // ELECCIONES
         [HttpGet]
         public async Task<IActionResult> GestionElecciones()
         {
@@ -189,8 +192,6 @@ namespace SistemaVotoMVC.Controllers
             }
 
             e.Titulo = e.Titulo.Trim();
-
-            // El estado lo define la API
             e.Estado = "";
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
@@ -258,8 +259,7 @@ namespace SistemaVotoMVC.Controllers
             return RedirectToAction(nameof(GestionElecciones));
         }
 
-        // LISTAS (por elección)
-
+        // LISTAS
         [HttpGet]
         public async Task<IActionResult> GestionListas(int eleccionId)
         {
@@ -369,8 +369,7 @@ namespace SistemaVotoMVC.Controllers
             return RedirectToAction(nameof(GestionListas), new { eleccionId });
         }
 
-        // CANDIDATOS (por elección)
-
+        // CANDIDATOS
         [HttpGet]
         public async Task<IActionResult> GestionCandidatos(int eleccionId)
         {
