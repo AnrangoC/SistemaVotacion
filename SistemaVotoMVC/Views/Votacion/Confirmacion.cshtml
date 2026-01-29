@@ -1,0 +1,24 @@
+﻿@{
+    ViewData["Title"] = "Confirmación";
+}
+
+<div class="container mt-5" style="max-width:700px;">
+    <div class="card shadow-sm border-0">
+        <div class="card-body text-center py-5">
+            <h3 class="fw-bold mb-2">Voto registrado</h3>
+
+            @if (TempData["Mensaje"] != null)
+            {
+                <div class="text-success fw-bold">@TempData["Mensaje"]</div>
+            }
+            else
+            {
+                <div class="text-success fw-bold">Gracias por participar.</div>
+            }
+
+            <div class="text-muted mt-3">
+                Puedes cerrar esta ventana.
+            </div>
+        </div>
+    </div>
+</div>

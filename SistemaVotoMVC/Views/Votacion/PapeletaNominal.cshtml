@@ -1,0 +1,122 @@
+﻿@model SistemaVotoMVC.Controllers.PapeletaNominalVm
+
+@{
+    ViewData["Title"] = "Papeleta Nominal";
+}
+
+<div class="container mt-4" style="max-width:1000px;">
+
+    <h3 class="fw-bold mb-1">Papeleta virtual (Nominal)</h3>
+    <div class="text-muted mb-3">
+        Elección: <b>@Model.TituloEleccion</b>
+    </div>
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+
+            <form asp-action="EmitirNominal" method="post">
+                @Html.AntiForgeryToken()
+
+                <input type="hidden" name="Cedula" value="@Model.Cedula" />
+                <input type="hidden" name="Token" value="@Model.Token" />
+                <input type="hidden" name="EleccionId" value="@Model.EleccionId" />
+                <input type="hidden" name="TituloEleccion" value="@Model.TituloEleccion" />
+
+                <div class="mb-3">
+                    <label class="fw-bold">Cargo</label>
+                    <select id="selCargo" class="form-select">
+                        @foreach (var r in Model.Roles)
+                        {
+                            <option value="@r">@r</option>
+                        }
+                    </select>
+                    <div class="text-muted small mt-1">
+                        Selecciona el cargo y luego el candidato
+                    </div>
+                </div>
+
+                <input type="hidden" name="rolPostulante" id="rolPostulanteHidden" value="@Model.RolSeleccionado" />
+
+                <div id="contenedorCandidatos" class="row g-3">
+                    @foreach (var c in Model.Candidatos)
+                    {
+                        var cargo = (c.RolPostulante ?? "").Trim();
+                        var nombre = c.Votante != null ? (c.Votante.NombreCompleto ?? "Sin nombre") : "Sin nombre";
+                        var lista = c.Lista != null ? (c.Lista.NombreLista ?? "") : "";
+                        var foto = c.Votante != null ? (c.Votante.FotoUrl ?? "") : "";
+
+                        <div class="col-md-6 candidato-item" data-cargo="@cargo">
+                            <label class="card border-1 h-100 p-3" style="cursor:pointer;">
+                                <div class="d-flex gap-3">
+                                    <input type="radio" name="candidatoId" value="@c.Id" />
+
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold">@nombre</div>
+                                        <div class="text-muted small">Lista: @lista</div>
+                                        <div class="text-muted small">Cargo: @cargo</div>
+                                        @if (!string.IsNullOrWhiteSpace(foto))
+                                        {
+                                            <div class="text-muted small">@foto</div>
+                                        }
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    }
+                </div>
+
+                <hr class="my-4" />
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success flex-grow-1"
+                            onclick="return confirm('¿Confirmar voto?');">
+                        Confirmar voto
+                    </button>
+
+                    <button type="submit" class="btn btn-outline-secondary"
+                            name="candidatoId" value="0"
+                            onclick="return confirm('¿Confirmar voto en blanco?');">
+                        Voto en blanco
+                    </button>
+                </div>
+
+                <div class="text-muted small mt-3">
+                    Al confirmar, se registra el voto y el token queda inválido.
+                </div>
+            </form>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function filtrarPorCargo() {
+            const cargo = (document.getElementById("selCargo").value || "");
+            document.getElementById("rolPostulanteHidden").value = cargo;
+
+            const items = document.querySelectorAll(".candidato-item");
+            items.forEach(x => {
+                const c = x.getAttribute("data-cargo") || "";
+                x.style.display = (cargo === "" || c === cargo) ? "" : "none";
+            });
+
+            // si el radio quedó oculto, lo desmarca
+            document.querySelectorAll("input[name='candidatoId']").forEach(r => {
+                const card = r.closest(".candidato-item");
+                if (card && card.style.display === "none") r.checked = false;
+            });
+        }
+
+        document.getElementById("selCargo").addEventListener("change", filtrarPorCargo);
+        filtrarPorCargo();
+    </script>
+}

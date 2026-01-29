@@ -23,7 +23,7 @@ namespace SistemaVotoModelos
         public bool Estado { get; set; } = true;
         public bool HaVotado { get; set; } = false;
         // Relación con Junta
-        public int? JuntaId { get; set; }
+        public long? JuntaId { get; set; }
         public Junta? Junta { get; set; }
     }
 }

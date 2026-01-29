@@ -1,0 +1,160 @@
+﻿@model IEnumerable<SistemaVotoModelos.Votante>
+
+@{
+    ViewData["Title"] = "Panel Jefe de Junta";
+    int juntaId = (ViewBag.JuntaId != null) ? (int)ViewBag.JuntaId : 0;
+}
+
+<div class="container mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="fw-bold mb-0">Panel Jefe de Junta</h3>
+            <div class="text-muted">
+                Bienvenido, <b>@(ViewBag.NombreJefe ?? "Jefe de Junta")</b> — Junta: <b>@juntaId</b>
+            </div>
+        </div>
+
+        <a asp-controller="Aut" asp-action="Logout" class="btn btn-outline-dark">
+            Salir
+        </a>
+    </div>
+
+    @if (TempData["Mensaje"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["Mensaje"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["Error"]
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    @if (TempData["TokenOk"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            <strong>@TempData["TokenOk"]</strong>
+            @if (TempData["TokenExp"] != null)
+            {
+                <div class="small text-muted">Expira: @TempData["TokenExp"]</div>
+            }
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+
+            <div class="row g-2 mb-3">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light">Buscar</span>
+                        <input id="buscador" class="form-control" placeholder="Buscar por cédula o nombre..." onkeyup="filtrarTabla()" />
+                    </div>
+                </div>
+
+                <div class="col-md-6 text-md-end">
+                    <span class="text-muted small">
+                        Total: <strong>@(Model?.Count() ?? 0)</strong> votantes
+                    </span>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle" id="tablaVotantes">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 140px;">Cédula</th>
+                            <th>Nombre</th>
+                            <th>Email</th>
+                            <th style="width: 120px;">Estado</th>
+                            <th style="width: 120px;">Votó</th>
+                            <th style="width: 220px;" class="text-end">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model == null || !Model.Any())
+                        {
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-4">
+                                    No hay votantes en esta junta.
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            foreach (var v in Model)
+                            {
+                                <tr class="fila-votante">
+                                    <td class="col-cedula">@v.Cedula</td>
+                                    <td class="col-nombre">@v.NombreCompleto</td>
+                                    <td>@v.Email</td>
+                                    <td>
+                                        @if (v.Estado)
+                                        {
+                                            <span class="badge bg-success">Activo</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Inactivo</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (v.HaVotado)
+                                        {
+                                            <span class="badge bg-dark">Sí</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning text-dark">No</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <form asp-action="GenerarToken" method="post" class="d-inline"
+                                              onsubmit="return confirm('¿Generar token para @v.NombreCompleto?');">
+                                            @Html.AntiForgeryToken()
+                                            <input type="hidden" name="cedulaVotante" value="@v.Cedula" />
+
+                                            <button type="submit"
+                                                    class="btn btn-primary btn-sm"
+                                                    @(v.HaVotado || !v.Estado ? "disabled" : "")>
+                                                Generar Token
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="text-muted small mt-3">
+                El token se genera solo si el votante está activo y no ha votado.
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+@section Scripts {
+    <script>
+        function filtrarTabla() {
+            const q = (document.getElementById("buscador").value || "").toLowerCase().trim();
+            const filas = document.querySelectorAll(".fila-votante");
+
+            filas.forEach(f => {
+                const ced = (f.querySelector(".col-cedula")?.innerText || "").toLowerCase();
+                const nom = (f.querySelector(".col-nombre")?.innerText || "").toLowerCase();
+                f.style.display = (ced.includes(q) || nom.includes(q)) ? "" : "none";
+            });
+        }
+    </script>
+}

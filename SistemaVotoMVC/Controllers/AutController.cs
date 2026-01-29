@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
 using SistemaVotoModelos.DTOs;
-using SistemaVotoMVC.DTOs;
 using SistemaVotoMVC.Models;
 using System.Net.Http.Json;
 using System.Security.Claims;
@@ -52,7 +51,6 @@ namespace SistemaVotoMVC.Controllers
                 return View(model);
             }
 
-            // Solo admin (1) y jefe de junta (3) deberían llegar aquí, pero igual queda seguro
             if (usuario.RolId != 1 && usuario.RolId != 3)
             {
                 ModelState.AddModelError("", "No tienes permisos para ingresar al panel de gestión.");
@@ -78,7 +76,7 @@ namespace SistemaVotoMVC.Controllers
 
             return usuario.RolId == 1
                 ? RedirectToAction("Main", "Admin")
-                : RedirectToAction("Index", "Junta");
+                : RedirectToAction("Index", "JefeJunta");
         }
 
         [HttpGet]

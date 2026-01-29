@@ -25,41 +25,23 @@ namespace SistemaVotoMVC.Controllers
         {
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
-            // 1) Juntas
             var respJ = await client.GetAsync(_endpointJuntas);
             var juntas = respJ.IsSuccessStatusCode
                 ? await respJ.Content.ReadFromJsonAsync<List<JuntaDetalleDto>>() ?? new List<JuntaDetalleDto>()
                 : new List<JuntaDetalleDto>();
 
             if (!respJ.IsSuccessStatusCode)
-            {
-                var apiMsg = await respJ.Content.ReadAsStringAsync();
-                TempData["Error"] = $"No se pudo obtener juntas desde la API. Código: {(int)respJ.StatusCode}. {apiMsg}";
-            }
+                TempData["Error"] = "No se pudo obtener juntas desde la API.";
 
-            // 2) Direcciones para el modal
             var respD = await client.GetAsync(_endpointDirecciones);
             var direcciones = respD.IsSuccessStatusCode
                 ? await respD.Content.ReadFromJsonAsync<List<Direccion>>() ?? new List<Direccion>()
                 : new List<Direccion>();
 
-            if (!respD.IsSuccessStatusCode)
-            {
-                var apiMsg = await respD.Content.ReadAsStringAsync();
-                TempData["Error"] = $"No se pudo obtener direcciones. Código: {(int)respD.StatusCode}. {apiMsg}";
-            }
-
-            // 3) Elecciones para el modal
             var respE = await client.GetAsync(_endpointElecciones);
             var elecciones = respE.IsSuccessStatusCode
                 ? await respE.Content.ReadFromJsonAsync<List<Eleccion>>() ?? new List<Eleccion>()
                 : new List<Eleccion>();
-
-            if (!respE.IsSuccessStatusCode)
-            {
-                var apiMsg = await respE.Content.ReadAsStringAsync();
-                TempData["Error"] = $"No se pudo obtener elecciones. Código: {(int)respE.StatusCode}. {apiMsg}";
-            }
 
             ViewBag.Direcciones = direcciones.OrderBy(d => d.Id).ToList();
             ViewBag.Elecciones = elecciones.OrderByDescending(e => e.Id).ToList();
@@ -90,9 +72,7 @@ namespace SistemaVotoMVC.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var apiMsg = await resp.Content.ReadAsStringAsync();
-            TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo crear juntas." : apiMsg;
-
+            TempData["Error"] = await resp.Content.ReadAsStringAsync();
             return RedirectToAction(nameof(Index));
         }
     }

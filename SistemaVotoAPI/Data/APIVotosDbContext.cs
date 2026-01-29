@@ -9,7 +9,6 @@ namespace SistemaVotoAPI.Data
             : base(options)
         {
         }
-
         public DbSet<Votante> Votantes { get; set; } = default!;
         public DbSet<Candidato> Candidatos { get; set; } = default!;
         public DbSet<Eleccion> Elecciones { get; set; } = default!;
@@ -83,7 +82,7 @@ namespace SistemaVotoAPI.Data
 
             modelBuilder.Entity<Junta>()
                 .Property(j => j.Id)
-                .ValueGeneratedOnAdd(); // Para que el Id sea autogenerado
+                .ValueGeneratedNever();
 
             modelBuilder.Entity<Junta>()
                 .HasOne(j => j.Direccion)
@@ -103,7 +102,7 @@ namespace SistemaVotoAPI.Data
                 .HasForeignKey(j => j.EleccionId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            // Esto permite repetir la misma mesa en otra elección sin chocar
+            // Permite repetir la misma mesa en otra elección sin chocar
             modelBuilder.Entity<Junta>()
                 .HasIndex(j => new { j.EleccionId, j.DireccionId, j.NumeroMesa })
                 .IsUnique();
@@ -118,7 +117,7 @@ namespace SistemaVotoAPI.Data
                 .HasForeignKey(t => t.VotanteId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // VOTO ANONIMO
+            // Para el voto anonimo
             modelBuilder.Entity<VotoAnonimo>()
                 .HasKey(v => v.Id);
 

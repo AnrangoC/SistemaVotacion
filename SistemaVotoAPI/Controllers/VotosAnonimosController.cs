@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
 using SistemaVotoModelos;
+using System;
+using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Controllers
 {
@@ -20,46 +18,76 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // GET: api/VotosAnonimos
-        // Este endpoint es solo para uso administrativo y reportes
-        // NO debe usarse para exponer votos individualmente al público
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<VotoAnonimo>>> GetVotosAnonimos()
+        // el token se usa solo para ingresar
+        [HttpPost("Emitir")]
+        public async Task<IActionResult> Emitir([FromBody] EmitirVotoRequestDto request)
         {
-            return await _context.VotosAnonimos.ToListAsync();
-        }
+            if (request == null)
+                return BadRequest("Datos inválidos.");
 
-        // POST: api/VotosAnonimos
-        // Registra un voto anónimo
-        // No se guarda información del votante
-        // El vínculo con el votante se rompe aquí
-        [HttpPost]
-        public async Task<ActionResult<VotoAnonimo>> PostVotoAnonimo(VotoAnonimo votoAnonimo)
-        {
-            /*
-             Validaciones mínimas obligatorias:
-              Elección válida
-              Dirección válida
-              Número de mesa válido
-            */
+            var cedula = (request.Cedula ?? "").Trim();
 
-            bool eleccionExiste = await _context.Elecciones
-                .AnyAsync(e => e.Id == votoAnonimo.EleccionId);
+            if (string.IsNullOrWhiteSpace(cedula))
+                return BadRequest("Debe enviar cedula.");
 
-            if (!eleccionExiste)
-                return BadRequest("Elección no válida");
+            if (request.EleccionId <= 0)
+                return BadRequest("EleccionId inválido.");
 
-            votoAnonimo.FechaVoto = DateTime.UtcNow;
+            var votante = await _context.Votantes.FindAsync(cedula);
+            if (votante == null || votante.Estado != true)
+                return Unauthorized("Votante no existe o inactivo.");
 
-            _context.VotosAnonimos.Add(votoAnonimo);
+            if (votante.HaVotado)
+                return Conflict("El votante ya votó.");
+
+            // Validar que la elección exista y esté ACTIVA
+            var eleccion = await _context.Elecciones.FindAsync(request.EleccionId);
+            if (eleccion == null)
+                return BadRequest("Elección no existe.");
+
+            if (eleccion.Estado != "ACTIVA")
+                return BadRequest("La elección no está activa.");
+
+            // Junta solo para DireccionId y NumeroMesa (reportes)
+            if (!votante.JuntaId.HasValue)
+                return BadRequest("El votante no tiene junta asignada.");
+
+            var junta = await _context.Juntas
+                .AsNoTracking()
+                .FirstOrDefaultAsync(j => j.Id == votante.JuntaId.Value);
+
+            if (junta == null)
+                return BadRequest("No se encontró la junta del votante.");
+
+            var voto = new VotoAnonimo
+            {
+                FechaVoto = DateTime.UtcNow,
+                EleccionId = request.EleccionId,
+                DireccionId = junta.DireccionId,
+                NumeroMesa = junta.NumeroMesa,
+
+                ListaId = request.ListaId, // 0 si voto en blanco
+                CedulaCandidato = (request.CedulaCandidato ?? "").Trim(),
+                RolPostulante = (request.RolPostulante ?? "").Trim()
+            };
+
+            // Marcar que ya votó 
+            votante.HaVotado = true;
+
+            _context.VotosAnonimos.Add(voto);
             await _context.SaveChangesAsync();
 
-            return Ok("Voto registrado correctamente");
+            return Ok("Voto registrado correctamente.");
         }
+    }
 
-        /*
-         El voto solo se crea no se puede ni editar ni eliminar y no se tiene que almacenar con un id del votante
-         
-        */
+    public class EmitirVotoRequestDto
+    {
+        public string Cedula { get; set; } = string.Empty;
+        public int EleccionId { get; set; }
+
+        public int ListaId { get; set; }               // 0 si voto en blanco
+        public string? CedulaCandidato { get; set; }   // opcional
+        public string? RolPostulante { get; set; }     // opcional
     }
 }

@@ -49,7 +49,7 @@ namespace SistemaVotoMVC.Controllers
             var respJuntas = await client.GetAsync("api/Juntas");
             if (respJuntas.IsSuccessStatusCode)
             {
-                // Usamos el DTO que ya tienes porque trae Ubicacion y DireccionId correctos
+                // Usamos el DTO que ya tenemos porque trae Ubicacion y DireccionId correctos
                 var juntas = await respJuntas.Content.ReadFromJsonAsync<List<SistemaVotoModelos.DTOs.JuntaDetalleDto>>()
                             ?? new List<SistemaVotoModelos.DTOs.JuntaDetalleDto>();
 

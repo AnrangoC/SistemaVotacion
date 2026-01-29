@@ -1,0 +1,34 @@
+﻿@model SistemaVotoMVC.Controllers.VotacionIngresoVm
+
+@{
+    ViewData["Title"] = "Ingreso a votación";
+}
+
+<div class="container mt-5" style="max-width:520px;">
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <h4 class="fw-bold mb-1">Acceder a la urna</h4>
+            <div class="text-muted mb-3">Ingresa tu cédula y el token que te dio el jefe de junta</div>
+
+            @if (TempData["Error"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show">
+                    @TempData["Error"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+
+            <form asp-action="Index" method="post">
+                @Html.AntiForgeryToken()
+
+                <label class="fw-bold">Cédula</label>
+                <input class="form-control mb-3" name="Cedula" maxlength="10" required />
+
+                <label class="fw-bold">Token</label>
+                <input class="form-control mb-3" name="Token" maxlength="6" required />
+
+                <button class="btn btn-primary w-100" type="submit">Continuar</button>
+            </form>
+        </div>
+    </div>
+</div>

@@ -9,8 +9,6 @@ using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Controllers
 {
-    // Por ahora la seguridad la controla el MVC con cookies y rol 1
-    // Luego podemos migrar esto a JWT y volver a activar [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class JuntasController : ControllerBase
@@ -22,7 +20,6 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // Estados Junta (int)
         // 1=Cerrada | 2=Abierta | 3=Pendiente de aprobación | 4=Aprobada
 
         [HttpGet]
@@ -35,19 +32,14 @@ namespace SistemaVotoAPI.Controllers
                 {
                     Id = j.Id,
                     NumeroMesa = j.NumeroMesa,
-
-                    // Esto es lo que faltaba para que el MVC no muestre Direccion 0
                     DireccionId = j.DireccionId,
                     EleccionId = j.EleccionId,
-
                     Ubicacion = j.Direccion == null
                         ? "Sin dirección"
                         : $"{j.Direccion.Provincia} - {j.Direccion.Canton} - {j.Direccion.Parroquia}",
-
                     NombreJefe = string.IsNullOrWhiteSpace(j.JefeDeJuntaId)
                         ? "Sin asignar"
                         : (j.JefeDeJunta != null ? j.JefeDeJunta.NombreCompleto : "Sin asignar"),
-
                     EstadoJunta = j.Estado
                 })
                 .OrderBy(j => j.Id)
@@ -56,22 +48,26 @@ namespace SistemaVotoAPI.Controllers
             return Ok(juntas);
         }
 
+        // Id Junta (Opción B): EleccionId + DireccionId + Mesa
+        // Ej: Eleccion 5, Direccion 010101, Mesa 01 -> 501010101
+        private static long ConstruirJuntaId(int eleccionId, int direccionId, int numeroMesa)
+        {
+            var idStr = $"{eleccionId}{direccionId:D6}{numeroMesa:D2}";
+            return long.Parse(idStr);
+        }
+
         [HttpPost("CrearPorDireccion")]
         public async Task<IActionResult> CrearPorDireccion(int eleccionId, int direccionId, int cantidad)
         {
-            if (eleccionId <= 0)
-                return BadRequest("Elección inválida.");
+            if (eleccionId <= 0) return BadRequest("Elección inválida.");
+            if (direccionId <= 0) return BadRequest("Dirección inválida.");
+            if (cantidad <= 0) return BadRequest("La cantidad debe ser mayor a cero.");
 
             var eleccionExiste = await _context.Elecciones.AnyAsync(e => e.Id == eleccionId);
-            if (!eleccionExiste)
-                return BadRequest("La elección no existe.");
+            if (!eleccionExiste) return BadRequest("La elección no existe.");
 
             var direccion = await _context.Direcciones.FindAsync(direccionId);
-            if (direccion == null)
-                return BadRequest("La dirección no existe.");
-
-            if (cantidad <= 0)
-                return BadRequest("La cantidad debe ser mayor a cero.");
+            if (direccion == null) return BadRequest("La dirección no existe.");
 
             int mesasExistentes = await _context.Juntas
                 .CountAsync(j => j.EleccionId == eleccionId && j.DireccionId == direccionId);
@@ -82,8 +78,7 @@ namespace SistemaVotoAPI.Controllers
             {
                 int numeroMesa = mesasExistentes + i;
 
-                // Id calculado por dirección + número de mesa
-                int juntaId = int.Parse($"{direccion.Id}{numeroMesa:D2}");
+                long juntaId = ConstruirJuntaId(eleccionId, direccion.Id, numeroMesa);
 
                 nuevasJuntas.Add(new Junta
                 {
@@ -103,7 +98,7 @@ namespace SistemaVotoAPI.Controllers
         }
 
         [HttpPut("AsignarJefe")]
-        public async Task<IActionResult> AsignarJefe(int juntaId, string cedulaVotante)
+        public async Task<IActionResult> AsignarJefe(long juntaId, string cedulaVotante)
         {
             if (string.IsNullOrWhiteSpace(cedulaVotante))
                 return BadRequest("Cédula obligatoria.");
@@ -111,22 +106,17 @@ namespace SistemaVotoAPI.Controllers
             cedulaVotante = cedulaVotante.Trim();
 
             var junta = await _context.Juntas.FindAsync(juntaId);
-            if (junta == null)
-                return NotFound("Junta no encontrada");
+            if (junta == null) return NotFound("Junta no encontrada");
 
             var votante = await _context.Votantes.FindAsync(cedulaVotante);
-            if (votante == null)
-                return NotFound("El votante no existe");
+            if (votante == null) return NotFound("El votante no existe");
 
-            // Regla: el jefe debe pertenecer a esa junta
             if (!votante.JuntaId.HasValue || votante.JuntaId.Value != juntaId)
                 return BadRequest("Ese votante no pertenece a esta junta.");
 
-            // Regla: admin no puede ser jefe
             if (votante.RolId == 1)
                 return BadRequest("Un administrador no puede ser jefe de junta.");
 
-            // Regla: candidato no puede ser jefe
             bool esCandidato = await _context.Candidatos.AnyAsync(c => c.Cedula == cedulaVotante);
             if (esCandidato)
                 return BadRequest("Un candidato no puede ser jefe de junta.");
@@ -139,11 +129,10 @@ namespace SistemaVotoAPI.Controllers
         }
 
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteJunta(int id)
+        public async Task<IActionResult> DeleteJunta(long id)
         {
             var junta = await _context.Juntas.FindAsync(id);
-            if (junta == null)
-                return NotFound();
+            if (junta == null) return NotFound();
 
             _context.Juntas.Remove(junta);
             await _context.SaveChangesAsync();
