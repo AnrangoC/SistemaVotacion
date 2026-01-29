@@ -18,33 +18,62 @@ namespace SistemaVotoMVC.Controllers
             _httpClientFactory = httpClientFactory;
         }
 
-        private long GetJuntaId()
-        {
-            var raw = User.FindFirstValue("JuntaId");
-            return long.TryParse(raw, out var id) ? id : 0;
-        }
-
         private string GetCedulaJefe()
         {
             return User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+        }
+
+        private async Task<long> GetJuntaIdActualAsync()
+        {
+            var cedulaJefe = GetCedulaJefe();
+            if (string.IsNullOrWhiteSpace(cedulaJefe))
+                return 0;
+
+            var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
+
+            var resp = await client.GetAsync($"api/Juntas/DeJefeActual/{cedulaJefe}");
+            if (!resp.IsSuccessStatusCode)
+                return 0;
+
+            var raw = await resp.Content.ReadAsStringAsync();
+
+            try
+            {
+                using var doc = JsonDocument.Parse(raw);
+                if (doc.RootElement.TryGetProperty("id", out var pid))
+                    return pid.GetInt64();
+                if (doc.RootElement.TryGetProperty("Id", out var pId))
+                    return pId.GetInt64();
+            }
+            catch { }
+
+            try
+            {
+                var junta = await resp.Content.ReadFromJsonAsync<Junta>();
+                return junta?.Id ?? 0;
+            }
+            catch { }
+
+            return 0;
         }
 
         [HttpGet]
         public async Task<IActionResult> Index()
         {
             ViewBag.NombreJefe = User.Identity?.Name ?? "Jefe de Junta";
-            ViewBag.JuntaId = GetJuntaId();
 
-            if ((int)ViewBag.JuntaId <= 0)
+            var juntaId = await GetJuntaIdActualAsync();
+            ViewBag.JuntaId = juntaId;
+
+            if (juntaId <= 0)
             {
-                TempData["Error"] = "No tienes una junta asignada en tu usuario.";
+                TempData["Error"] = "No tienes una junta asignada para la elección activa.";
                 return View(new List<Votante>());
             }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
-            // GET api/Votantes/PorJunta/{juntaId}
-            var resp = await client.GetAsync($"api/Votantes/PorJunta/{(int)ViewBag.JuntaId}");
+            var resp = await client.GetAsync($"api/Votantes/PorJunta/{juntaId}");
 
             var votantes = resp.IsSuccessStatusCode
                 ? await resp.Content.ReadFromJsonAsync<List<Votante>>() ?? new List<Votante>()
@@ -67,12 +96,17 @@ namespace SistemaVotoMVC.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var juntaId = GetJuntaId();
             var cedulaJefe = GetCedulaJefe();
-
-            if (juntaId <= 0 || string.IsNullOrWhiteSpace(cedulaJefe))
+            if (string.IsNullOrWhiteSpace(cedulaJefe))
             {
                 TempData["Error"] = "No se pudo validar tu sesión como jefe de junta.";
+                return RedirectToAction(nameof(Index));
+            }
+
+            var juntaId = await GetJuntaIdActualAsync();
+            if (juntaId <= 0)
+            {
+                TempData["Error"] = "No tienes una junta asignada para la elección activa.";
                 return RedirectToAction(nameof(Index));
             }
 
@@ -91,7 +125,6 @@ namespace SistemaVotoMVC.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            // 1) Si la API devuelve TokenVotacionDto
             try
             {
                 var dto = await resp.Content.ReadFromJsonAsync<TokenVotacionDto>();
@@ -104,7 +137,6 @@ namespace SistemaVotoMVC.Controllers
             }
             catch { }
 
-            // 2) Si la API devuelve { Cedula, Token, Expira } o { cedula, token, expira }
             try
             {
                 using var doc = JsonDocument.Parse(raw);
@@ -114,7 +146,6 @@ namespace SistemaVotoMVC.Controllers
                 string? tok = null;
                 string? exp = null;
 
-                // soporta ambas variantes de nombres
                 if (root.TryGetProperty("Cedula", out var pCed)) ced = pCed.GetString();
                 if (root.TryGetProperty("cedula", out var pced)) ced ??= pced.GetString();
 
@@ -124,7 +155,6 @@ namespace SistemaVotoMVC.Controllers
                 if (root.TryGetProperty("Expira", out var pExp)) exp = pExp.GetString();
                 if (root.TryGetProperty("expira", out var pexp)) exp ??= pexp.GetString();
 
-                // compatibilidad por si tu API devuelve { cedula, codigo }
                 if (root.TryGetProperty("codigo", out var pCod)) tok ??= pCod.GetString();
                 if (root.TryGetProperty("Codigo", out var pCodigo)) tok ??= pCodigo.GetString();
 
@@ -141,7 +171,5 @@ namespace SistemaVotoMVC.Controllers
             TempData["Error"] = "No se pudo leer el token generado.";
             return RedirectToAction(nameof(Index));
         }
-
-
     }
 }

@@ -4,7 +4,6 @@
 
 <div class="container mt-5">
 
-    <!-- Encabezado -->
     <div class="row mb-4">
         <div class="col text-center">
             <h2 class="fw-bold">🛡️ Panel de Administración</h2>
@@ -14,10 +13,9 @@
         </div>
     </div>
 
-    <!-- Tarjetas -->
     <div class="row g-4 justify-content-center">
 
-        <!-- Votantes -->
+        <!-- VOTANTES -->
         <div class="col-md-4">
             <div class="card shadow-lg border-0 h-100 text-center">
                 <div class="card-body py-4">
@@ -37,7 +35,7 @@
             </div>
         </div>
 
-        <!-- Elecciones -->
+        <!-- ELECCIONES -->
         <div class="col-md-4">
             <div class="card shadow-lg border-0 h-100 text-center">
                 <div class="card-body py-4">
@@ -53,12 +51,11 @@
                        class="btn btn-success w-100">
                         Gestionar Elecciones
                     </a>
-
                 </div>
             </div>
         </div>
 
-        <!-- Juntas -->
+        <!-- JUNTAS (CREACIÓN / MONITOREO) -->
         <div class="col-md-4">
             <div class="card shadow-lg border-0 h-100 text-center">
                 <div class="card-body py-4">
@@ -67,10 +64,10 @@
                     </div>
                     <h5 class="fw-bold">Gestión de Juntas</h5>
                     <p class="text-muted small">
-                        Asignación de jefes de junta y control de mesas.
+                        Crear mesas y monitorear su estado general.
                     </p>
-                    <a asp-controller="Juntas"
-                       asp-action="Index"
+                    <a asp-controller="Admin"
+                       asp-action="GestionJuntas"
                        class="btn btn-warning w-100 text-dark">
                         Administrar Juntas
                     </a>
@@ -78,9 +75,28 @@
             </div>
         </div>
 
+        <!-- VERIFICAR JUNTAS -->
+        <div class="col-md-4">
+            <div class="card shadow-lg border-0 h-100 text-center">
+                <div class="card-body py-4">
+                    <div class="mb-3">
+                        <i class="bi bi-clipboard-check-fill fs-1 text-success"></i>
+                    </div>
+                    <h5 class="fw-bold">Verificación de Juntas</h5>
+                    <p class="text-muted small">
+                        Aprobar juntas por elección antes del conteo oficial.
+                    </p>
+                    <a asp-controller="Admin"
+                       asp-action="VerificarJuntas"
+                       class="btn btn-outline-success w-100">
+                        Verificar Juntas
+                    </a>
+                </div>
+            </div>
+        </div>
+
     </div>
 
-    <!-- Footer -->
     <div class="row mt-5">
         <div class="col text-center text-muted small">
             Sistema de Votación Electrónica • Panel Administrativo

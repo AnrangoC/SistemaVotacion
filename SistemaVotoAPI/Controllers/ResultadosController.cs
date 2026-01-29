@@ -1,6 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
+using SistemaVotoModelos;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -21,15 +24,17 @@ namespace SistemaVotoAPI.Controllers
         // 1=Cerrada | 2=Abierta | 3=Pendiente de aprobación | 4=Aprobada
 
         // RESULTADOS POR JUNTA (solo si está aprobada)
-        [HttpGet("PorJunta/{juntaId:int}")]
-        public async Task<IActionResult> ResultadosPorJunta(int juntaId)
+        // Se cambia a long para coincidir con el modelo Junta
+        [HttpGet("PorJunta/{juntaId:long}")]
+        public async Task<IActionResult> ResultadosPorJunta(long juntaId)
         {
             var junta = await _context.Juntas.FindAsync(juntaId);
             if (junta == null)
                 return NotFound("Junta no encontrada.");
 
+            // Regla de negocio: No se muestran resultados si no está aprobada (Estado 4)
             if (junta.Estado != 4)
-                return Conflict("Aún no hay resultados: la junta no está aprobada.");
+                return Conflict("Aún no hay resultados: la junta no ha sido aprobada por el administrador.");
 
             var resultados = await _context.VotosAnonimos
                 .Where(v =>
@@ -58,7 +63,7 @@ namespace SistemaVotoAPI.Controllers
 
             int eleccionId = lista.EleccionId;
 
-            // Solo cuenta votos de juntas aprobadas (Estado=4)
+            // Solo cuenta votos de juntas aprobadas (Estado=4) mediante Join de seguridad
             var total = await (
                 from v in _context.VotosAnonimos
                 join j in _context.Juntas
@@ -73,7 +78,8 @@ namespace SistemaVotoAPI.Controllers
             return Ok(new
             {
                 ListaId = listaId,
-                TotalVotos = total
+                NombreLista = lista.NombreLista,
+                TotalVotosValidados = total
             });
         }
 
@@ -89,7 +95,6 @@ namespace SistemaVotoAPI.Controllers
             if (string.IsNullOrWhiteSpace(provincia))
                 return BadRequest("Provincia obligatoria.");
 
-            // Si no mandan elección, tomo la más reciente por FechaInicio
             int eid;
             if (eleccionId.HasValue && eleccionId.Value > 0)
             {
@@ -114,7 +119,7 @@ namespace SistemaVotoAPI.Controllers
                     on new { v.EleccionId, v.DireccionId, v.NumeroMesa }
                     equals new { j.EleccionId, j.DireccionId, j.NumeroMesa }
                 where v.EleccionId == eid
-                      && j.Estado == 4
+                      && j.Estado == 4 // Seguridad: solo juntas validadas
                       && d.Provincia == provincia
                 select new { v, d };
 
@@ -144,18 +149,19 @@ namespace SistemaVotoAPI.Controllers
         }
 
         // VALIDACIÓN PARA CIERRE DE JUNTA
-        // Aquí no obligo que esté aprobada, porque esto es para que el admin compare
-        [HttpGet("ValidarCierreJunta/{juntaId:int}")]
-        public async Task<IActionResult> ValidarCierreJunta(int juntaId)
+        [HttpGet("ValidarCierreJunta/{juntaId:long}")]
+        public async Task<IActionResult> ValidarCierreJunta(long juntaId)
         {
             var junta = await _context.Juntas.FindAsync(juntaId);
             if (junta == null)
                 return NotFound("Junta no encontrada.");
 
-            var totalVotantes = await _context.Votantes
-                .CountAsync(v => v.JuntaId == juntaId);
+            // Cuenta cuántos votantes registrados en esta mesa efectivamente marcaron su voto
+            var totalVotantesQueFirmaron = await _context.Votantes
+                .CountAsync(v => v.JuntaId == juntaId && v.HaVotado == true);
 
-            var totalVotos = await _context.VotosAnonimos
+            // Cuenta cuántos registros anónimos existen en la urna digital para esta mesa
+            var totalVotosEnUrna = await _context.VotosAnonimos
                 .CountAsync(v =>
                     v.EleccionId == junta.EleccionId &&
                     v.DireccionId == junta.DireccionId &&
@@ -166,9 +172,10 @@ namespace SistemaVotoAPI.Controllers
             {
                 JuntaId = juntaId,
                 NumeroMesa = junta.NumeroMesa,
-                TotalVotantes = totalVotantes,
-                TotalVotosEmitidos = totalVotos,
-                Coinciden = totalVotantes == totalVotos
+                ParticipacionReal = totalVotantesQueFirmaron,
+                VotosContabilizados = totalVotosEnUrna,
+                Consistencia = totalVotantesQueFirmaron == totalVotosEnUrna,
+                Diferencia = Math.Abs(totalVotantesQueFirmaron - totalVotosEnUrna)
             });
         }
     }

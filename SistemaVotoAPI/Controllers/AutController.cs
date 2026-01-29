@@ -99,8 +99,8 @@ namespace SistemaVotoAPI.Controllers
             if (jefe.JuntaId == null || votante.JuntaId == null || jefe.JuntaId != votante.JuntaId)
                 return BadRequest("El votante no pertenece a su junta.");
 
-            if (votante.RolId != 2)
-                return BadRequest("Solo votantes pueden recibir token.");
+            //if (votante.RolId != 2)
+              //  return BadRequest("Solo votantes pueden recibir token.");
 
             if (votante.HaVotado)
                 return Conflict("El votante ya votó.");
@@ -118,7 +118,7 @@ namespace SistemaVotoAPI.Controllers
                 Codigo = new Random().Next(100000, 999999).ToString(),
                 VotanteId = votante.Cedula,
                 EsValido = true,
-                FechaCreacion = DateTime.UtcNow
+                FechaCreacion = DateTime.Now
             };
 
             _context.TokensAcceso.Add(token);
@@ -154,7 +154,7 @@ namespace SistemaVotoAPI.Controllers
                 return Unauthorized("Token inválido o usado.");
 
             var expira = token.FechaCreacion.AddMinutes(TOKEN_MINUTOS_VALIDEZ);
-            if (DateTime.UtcNow > expira)
+            if (DateTime.Now > expira)
             {
                 token.EsValido = false;
                 await _context.SaveChangesAsync();

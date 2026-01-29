@@ -18,7 +18,7 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // el token se usa solo para ingresar
+        // El token se usa solo para ingresar al sistema en el cliente MVC
         [HttpPost("Emitir")]
         public async Task<IActionResult> Emitir([FromBody] EmitirVotoRequestDto request)
         {
@@ -28,50 +28,56 @@ namespace SistemaVotoAPI.Controllers
             var cedula = (request.Cedula ?? "").Trim();
 
             if (string.IsNullOrWhiteSpace(cedula))
-                return BadRequest("Debe enviar cedula.");
+                return BadRequest("Debe enviar cédula.");
 
             if (request.EleccionId <= 0)
                 return BadRequest("EleccionId inválido.");
 
+            // 1. Validar que el votante existe, está activo y no ha votado aún
             var votante = await _context.Votantes.FindAsync(cedula);
             if (votante == null || votante.Estado != true)
-                return Unauthorized("Votante no existe o inactivo.");
+                return Unauthorized("Votante no existe o está inactivo.");
 
             if (votante.HaVotado)
-                return Conflict("El votante ya votó.");
+                return Conflict("El votante ya registró su voto.");
 
-            // Validar que la elección exista y esté ACTIVA
+            // 2. Validar que la elección exista y su estado sea estrictamente "ACTIVA"
             var eleccion = await _context.Elecciones.FindAsync(request.EleccionId);
             if (eleccion == null)
-                return BadRequest("Elección no existe.");
+                return BadRequest("La elección no existe.");
 
             if (eleccion.Estado != "ACTIVA")
-                return BadRequest("La elección no está activa.");
+                return BadRequest("La elección no está habilitada para recibir votos en este momento.");
 
-            // Junta solo para DireccionId y NumeroMesa (reportes)
+            // 3. Validar la existencia y el estado de la junta asignada
             if (!votante.JuntaId.HasValue)
-                return BadRequest("El votante no tiene junta asignada.");
+                return BadRequest("El votante no tiene una junta asignada.");
 
             var junta = await _context.Juntas
-                .AsNoTracking()
                 .FirstOrDefaultAsync(j => j.Id == votante.JuntaId.Value);
 
             if (junta == null)
                 return BadRequest("No se encontró la junta del votante.");
 
+            // REGLA DE NEGOCIO: Solo se permite votar si la junta está en estado 2 (Abierta)
+            if (junta.Estado != 2)
+                return BadRequest("La junta no se encuentra abierta para recibir sufragios.");
+
+            // 4. Crear el registro de voto anónimo
             var voto = new VotoAnonimo
             {
-                FechaVoto = DateTime.UtcNow,
+                // Uso de hora local de Ecuador para consistencia con EleccionesController
+                FechaVoto = DateTime.Now,
                 EleccionId = request.EleccionId,
                 DireccionId = junta.DireccionId,
                 NumeroMesa = junta.NumeroMesa,
 
-                ListaId = request.ListaId, // 0 si voto en blanco
+                ListaId = request.ListaId, // 0 indica voto en blanco
                 CedulaCandidato = (request.CedulaCandidato ?? "").Trim(),
                 RolPostulante = (request.RolPostulante ?? "").Trim()
             };
 
-            // Marcar que ya votó 
+            // 5. Marcar al votante para impedir que vote nuevamente y guardar cambios
             votante.HaVotado = true;
 
             _context.VotosAnonimos.Add(voto);

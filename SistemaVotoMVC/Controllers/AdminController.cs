@@ -1,11 +1,13 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SistemaVotoModelos;
+using SistemaVotoModelos.DTOs;
 using System.Net.Http.Json;
 
 namespace SistemaVotoMVC.Controllers
 {
     [Authorize(Roles = "1")]
+    [Route("[controller]/[action]")]
     public class AdminController : Controller
     {
         private readonly IHttpClientFactory _httpClientFactory;
@@ -15,13 +17,13 @@ namespace SistemaVotoMVC.Controllers
         private readonly string _endpointListas = "api/Listas";
         private readonly string _endpointCandidatos = "api/Candidatos";
         private readonly string _endpointJuntas = "api/Juntas";
+        private readonly string _endpointDirecciones = "api/Direcciones";
 
         public AdminController(IHttpClientFactory httpClientFactory)
         {
             _httpClientFactory = httpClientFactory;
         }
 
-        // PANEL PRINCIPAL
         [HttpGet]
         public IActionResult Main()
         {
@@ -29,74 +31,119 @@ namespace SistemaVotoMVC.Controllers
             return View();
         }
 
-        // VOTANTES
         [HttpGet]
-        public async Task<IActionResult> GestionVotantes()
+        public async Task<IActionResult> GestionJuntas()
         {
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
-            // 1) Votantes
-            var response = await client.GetAsync(_endpointVotantes);
+            var response = await client.GetAsync(_endpointJuntas);
+            var juntas = response.IsSuccessStatusCode
+                ? await response.Content.ReadFromJsonAsync<List<JuntaDetalleDto>>() ?? new List<JuntaDetalleDto>()
+                : new List<JuntaDetalleDto>();
 
-            var lista = response.IsSuccessStatusCode
-                ? await response.Content.ReadFromJsonAsync<List<Votante>>() ?? new List<Votante>()
-                : new List<Votante>();
+            var respDir = await client.GetAsync(_endpointDirecciones);
+            ViewBag.Direcciones = respDir.IsSuccessStatusCode
+                ? await respDir.Content.ReadFromJsonAsync<List<Direccion>>() ?? new List<Direccion>()
+                : new List<Direccion>();
+
+            var respElec = await client.GetAsync(_endpointElecciones);
+            ViewBag.Elecciones = respElec.IsSuccessStatusCode
+                ? await respElec.Content.ReadFromJsonAsync<List<Eleccion>>() ?? new List<Eleccion>()
+                : new List<Eleccion>();
 
             if (!response.IsSuccessStatusCode)
-                TempData["Error"] = "No se pudo obtener la lista de votantes desde la API.";
+                TempData["Error"] = "No se pudo obtener el listado de juntas.";
 
-            // 2) Juntas (para el combo)
-            var respJuntas = await client.GetAsync("api/Juntas");
-            if (respJuntas.IsSuccessStatusCode)
-            {
-                // Usamos el DTO que ya tenemos porque trae Ubicacion y DireccionId correctos
-                var juntas = await respJuntas.Content.ReadFromJsonAsync<List<SistemaVotoModelos.DTOs.JuntaDetalleDto>>()
-                            ?? new List<SistemaVotoModelos.DTOs.JuntaDetalleDto>();
-
-                ViewBag.Juntas = juntas;
-            }
-            else
-            {
-                ViewBag.Juntas = new List<SistemaVotoModelos.DTOs.JuntaDetalleDto>();
-                TempData["ErrorJuntas"] = "No se pudo obtener juntas desde la API.";
-            }
-
-            return View(lista);
+            return View("~/Views/Juntas/Index.cshtml", juntas);
         }
 
 
         [HttpPost]
         [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AprobarJunta(long id)
+        {
+            if (id <= 0)
+            {
+                TempData["Error"] = "Identificador de junta no válido.";
+                return RedirectToAction(nameof(GestionJuntas));
+            }
+
+            var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
+            var response = await client.PutAsync($"{_endpointJuntas}/AprobarJunta/{id}", null);
+
+            if (response.IsSuccessStatusCode)
+                TempData["Mensaje"] = "Junta aprobada exitosamente.";
+            else
+                TempData["Error"] = await response.Content.ReadAsStringAsync();
+
+            return RedirectToAction(nameof(GestionJuntas));
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearJuntaPorDireccion(int eleccionId, int direccionId, int cantidad)
+        {
+            if (eleccionId <= 0 || direccionId <= 0 || cantidad <= 0)
+            {
+                TempData["Error"] = "Datos para la creación de juntas inválidos.";
+                return RedirectToAction(nameof(GestionJuntas));
+            }
+
+            var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
+            var url = $"{_endpointJuntas}/CrearPorDireccion?eleccionId={eleccionId}&direccionId={direccionId}&cantidad={cantidad}";
+            var response = await client.PostAsync(url, null);
+
+            if (response.IsSuccessStatusCode)
+                TempData["Mensaje"] = "Mesas creadas correctamente.";
+            else
+                TempData["Error"] = await response.Content.ReadAsStringAsync();
+
+            return RedirectToAction(nameof(GestionJuntas));
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GestionVotantes()
+        {
+            var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
+
+            var respVotantes = await client.GetAsync(_endpointVotantes);
+            var lista = respVotantes.IsSuccessStatusCode
+                ? await respVotantes.Content.ReadFromJsonAsync<List<Votante>>() ?? new List<Votante>()
+                : new List<Votante>();
+
+            var respJuntas = await client.GetAsync(_endpointJuntas);
+            ViewBag.Juntas = respJuntas.IsSuccessStatusCode
+                ? await respJuntas.Content.ReadFromJsonAsync<List<JuntaDetalleDto>>() ?? new List<JuntaDetalleDto>()
+                : new List<JuntaDetalleDto>();
+
+            if (!respVotantes.IsSuccessStatusCode)
+                TempData["Error"] = await respVotantes.Content.ReadAsStringAsync();
+
+            return View(lista);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> CrearVotante(Votante v)
         {
-            if (v == null)
-            {
-                TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction(nameof(GestionVotantes));
-            }
+            if (v == null) return RedirectToAction(nameof(GestionVotantes));
 
             v.Cedula = (v.Cedula ?? "").Trim();
             v.NombreCompleto = (v.NombreCompleto ?? "").Trim();
             v.Email = (v.Email ?? "").Trim();
             v.FotoUrl = (v.FotoUrl ?? "").Trim();
+            v.Password = (v.Password ?? "").Trim();
 
-            if (v.RolId == 2)
-                v.Password = "";
-
-            if (v.JuntaId.HasValue && v.JuntaId.Value <= 0)
-                v.JuntaId = null;
+            if (v.RolId == 2 && string.IsNullOrWhiteSpace(v.Password))
+                v.Password = "VOTANTE_NORMAL";
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
             var response = await client.PostAsJsonAsync(_endpointVotantes, v);
 
             if (response.IsSuccessStatusCode)
-            {
-                TempData["Mensaje"] = "Usuario creado exitosamente.";
-                return RedirectToAction(nameof(GestionVotantes));
-            }
-
-            var apiMsg = await response.Content.ReadAsStringAsync();
-            TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo crear el usuario." : apiMsg;
+                TempData["Mensaje"] = "Usuario registrado correctamente.";
+            else
+                TempData["Error"] = await response.Content.ReadAsStringAsync();
 
             return RedirectToAction(nameof(GestionVotantes));
         }
@@ -105,35 +152,39 @@ namespace SistemaVotoMVC.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditarVotante(Votante v)
         {
-            if (v == null || string.IsNullOrWhiteSpace(v.Cedula))
+            if (v == null)
             {
-                TempData["Error"] = "Datos inválidos.";
+                TempData["Error"] = "Datos no proporcionados.";
                 return RedirectToAction(nameof(GestionVotantes));
             }
 
-            v.Cedula = v.Cedula.Trim();
+            v.Cedula = (v.Cedula ?? "").Trim();
             v.NombreCompleto = (v.NombreCompleto ?? "").Trim();
             v.Email = (v.Email ?? "").Trim();
             v.FotoUrl = (v.FotoUrl ?? "").Trim();
 
-            if (v.RolId == 2 && string.IsNullOrWhiteSpace(v.Password))
-                v.Password = "";
+            // si viene vacío, la API NO cambia la contraseña
+            v.Password = (v.Password ?? "").Trim();
 
-            if (v.JuntaId.HasValue && v.JuntaId.Value <= 0)
-                v.JuntaId = null;
+            if (string.IsNullOrWhiteSpace(v.Cedula))
+            {
+                TempData["Error"] = "La cédula es obligatoria.";
+                return RedirectToAction(nameof(GestionVotantes));
+            }
+
+            if (v.RolId < 1 || v.RolId > 3)
+            {
+                TempData["Error"] = "Rol inválido.";
+                return RedirectToAction(nameof(GestionVotantes));
+            }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
-            var response = await client.PutAsJsonAsync($"{_endpointVotantes}/{v.Cedula}", v);
+            var resp = await client.PutAsJsonAsync($"{_endpointVotantes}/{v.Cedula}", v);
 
-            if (response.IsSuccessStatusCode)
-                TempData["Mensaje"] = "Datos actualizados correctamente.";
+            if (resp.IsSuccessStatusCode)
+                TempData["Mensaje"] = "Usuario actualizado.";
             else
-            {
-                var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg)
-                    ? "Error al intentar actualizar el usuario."
-                    : apiMsg;
-            }
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
 
             return RedirectToAction(nameof(GestionVotantes));
         }
@@ -142,6 +193,7 @@ namespace SistemaVotoMVC.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EliminarVotante(string cedula)
         {
+            cedula = (cedula ?? "").Trim();
             if (string.IsNullOrWhiteSpace(cedula))
             {
                 TempData["Error"] = "Cédula inválida.";
@@ -149,22 +201,16 @@ namespace SistemaVotoMVC.Controllers
             }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
-            var response = await client.DeleteAsync($"{_endpointVotantes}/{cedula.Trim()}");
+            var resp = await client.DeleteAsync($"{_endpointVotantes}/{cedula}");
 
-            if (response.IsSuccessStatusCode)
+            if (resp.IsSuccessStatusCode)
                 TempData["Mensaje"] = "Usuario eliminado.";
             else
-            {
-                var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg)
-                    ? "No se pudo eliminar el registro."
-                    : apiMsg;
-            }
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
 
             return RedirectToAction(nameof(GestionVotantes));
         }
 
-        // ELECCIONES
         [HttpGet]
         public async Task<IActionResult> GestionElecciones()
         {
@@ -176,7 +222,7 @@ namespace SistemaVotoMVC.Controllers
                 : new List<Eleccion>();
 
             if (!response.IsSuccessStatusCode)
-                TempData["Error"] = "No se pudo obtener la lista de elecciones desde la API.";
+                TempData["Error"] = await response.Content.ReadAsStringAsync();
 
             return View(lista);
         }
@@ -185,14 +231,25 @@ namespace SistemaVotoMVC.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CrearEleccion(Eleccion e)
         {
-            if (e == null || string.IsNullOrWhiteSpace(e.Titulo))
+            if (e == null)
             {
-                TempData["Error"] = "Datos inválidos.";
+                TempData["Error"] = "Datos no proporcionados.";
                 return RedirectToAction(nameof(GestionElecciones));
             }
 
-            e.Titulo = e.Titulo.Trim();
-            e.Estado = "";
+            e.Titulo = (e.Titulo ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(e.Titulo))
+            {
+                TempData["Error"] = "El título es obligatorio.";
+                return RedirectToAction(nameof(GestionElecciones));
+            }
+
+            if (e.FechaFin <= e.FechaInicio)
+            {
+                TempData["Error"] = "La fecha/hora fin debe ser mayor que la fecha/hora inicio.";
+                return RedirectToAction(nameof(GestionElecciones));
+            }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
             var response = await client.PostAsJsonAsync(_endpointElecciones, e);
@@ -200,10 +257,7 @@ namespace SistemaVotoMVC.Controllers
             if (response.IsSuccessStatusCode)
                 TempData["Mensaje"] = "Elección creada correctamente.";
             else
-            {
-                var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo crear la elección." : apiMsg;
-            }
+                TempData["Error"] = await response.Content.ReadAsStringAsync();
 
             return RedirectToAction(nameof(GestionElecciones));
         }
@@ -212,14 +266,7 @@ namespace SistemaVotoMVC.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditarEleccion(Eleccion e)
         {
-            if (e == null || e.Id <= 0)
-            {
-                TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction(nameof(GestionElecciones));
-            }
-
-            e.Titulo = (e.Titulo ?? "").Trim();
-            e.Estado = "";
+            if (e == null || e.Id <= 0) return RedirectToAction(nameof(GestionElecciones));
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
             var response = await client.PutAsJsonAsync($"{_endpointElecciones}/{e.Id}", e);
@@ -227,10 +274,7 @@ namespace SistemaVotoMVC.Controllers
             if (response.IsSuccessStatusCode)
                 TempData["Mensaje"] = "Elección actualizada.";
             else
-            {
-                var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo actualizar la elección." : apiMsg;
-            }
+                TempData["Error"] = await response.Content.ReadAsStringAsync();
 
             return RedirectToAction(nameof(GestionElecciones));
         }
@@ -239,110 +283,92 @@ namespace SistemaVotoMVC.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EliminarEleccion(int id)
         {
-            if (id <= 0)
-            {
-                TempData["Error"] = "Id inválido.";
-                return RedirectToAction(nameof(GestionElecciones));
-            }
-
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
             var response = await client.DeleteAsync($"{_endpointElecciones}/{id}");
 
             if (response.IsSuccessStatusCode)
                 TempData["Mensaje"] = "Elección eliminada.";
             else
-            {
-                var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo eliminar la elección." : apiMsg;
-            }
+                TempData["Error"] = "No se puede eliminar una elección con datos asociados.";
 
             return RedirectToAction(nameof(GestionElecciones));
         }
 
         // LISTAS
+
         [HttpGet]
         public async Task<IActionResult> GestionListas(int eleccionId)
         {
             if (eleccionId <= 0)
             {
-                TempData["Error"] = "Elección inválida.";
+                TempData["Error"] = "Elección no válida.";
                 return RedirectToAction(nameof(GestionElecciones));
             }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
-            var respEleccion = await client.GetAsync($"{_endpointElecciones}/{eleccionId}");
-            if (!respEleccion.IsSuccessStatusCode)
-            {
-                TempData["Error"] = "Elección no encontrada.";
-                return RedirectToAction(nameof(GestionElecciones));
-            }
+            var respElec = await client.GetAsync($"{_endpointElecciones}/{eleccionId}");
+            ViewBag.Eleccion = respElec.IsSuccessStatusCode
+                ? await respElec.Content.ReadFromJsonAsync<Eleccion>()
+                : null;
 
-            ViewBag.Eleccion = await respEleccion.Content.ReadFromJsonAsync<Eleccion>();
-
-            var respListas = await client.GetAsync($"{_endpointListas}/PorEleccion/{eleccionId}");
-            var listas = respListas.IsSuccessStatusCode
-                ? await respListas.Content.ReadFromJsonAsync<List<Lista>>() ?? new List<Lista>()
+            var resp = await client.GetAsync($"{_endpointListas}/PorEleccion/{eleccionId}");
+            var listas = resp.IsSuccessStatusCode
+                ? await resp.Content.ReadFromJsonAsync<List<Lista>>() ?? new List<Lista>()
                 : new List<Lista>();
 
-            if (!respListas.IsSuccessStatusCode)
-                TempData["Error"] = "No se pudo obtener las listas de la elección.";
+            if (!resp.IsSuccessStatusCode)
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
 
             return View(listas);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CrearLista(Lista l)
+        public async Task<IActionResult> CrearLista(Lista lista)
         {
-            if (l == null || l.EleccionId <= 0 || string.IsNullOrWhiteSpace(l.NombreLista))
+            if (lista == null || lista.EleccionId <= 0)
             {
-                TempData["Error"] = "Datos inválidos.";
+                TempData["Error"] = "No llegó la elección.";
                 return RedirectToAction(nameof(GestionElecciones));
             }
 
-            l.NombreLista = l.NombreLista.Trim();
-            l.LogoUrl = (l.LogoUrl ?? "").Trim();
+            lista.NombreLista = (lista.NombreLista ?? "").Trim();
+            lista.LogoUrl = (lista.LogoUrl ?? "").Trim();
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
-            var response = await client.PostAsJsonAsync(_endpointListas, l);
+            var resp = await client.PostAsJsonAsync(_endpointListas, lista);
 
-            if (response.IsSuccessStatusCode)
+            if (resp.IsSuccessStatusCode)
                 TempData["Mensaje"] = "Lista creada.";
             else
-            {
-                var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo crear la lista." : apiMsg;
-            }
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
 
-            return RedirectToAction(nameof(GestionListas), new { eleccionId = l.EleccionId });
+            return RedirectToAction(nameof(GestionListas), new { eleccionId = lista.EleccionId });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EditarLista(Lista l)
+        public async Task<IActionResult> EditarLista(Lista cambios)
         {
-            if (l == null || l.Id <= 0 || l.EleccionId <= 0)
+            if (cambios == null || cambios.Id <= 0 || cambios.EleccionId <= 0)
             {
                 TempData["Error"] = "Datos inválidos.";
                 return RedirectToAction(nameof(GestionElecciones));
             }
 
-            l.NombreLista = (l.NombreLista ?? "").Trim();
-            l.LogoUrl = (l.LogoUrl ?? "").Trim();
+            cambios.NombreLista = (cambios.NombreLista ?? "").Trim();
+            cambios.LogoUrl = (cambios.LogoUrl ?? "").Trim();
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
-            var response = await client.PutAsJsonAsync($"{_endpointListas}/{l.Id}", l);
+            var resp = await client.PutAsJsonAsync($"{_endpointListas}/{cambios.Id}", cambios);
 
-            if (response.IsSuccessStatusCode)
+            if (resp.IsSuccessStatusCode)
                 TempData["Mensaje"] = "Lista actualizada.";
             else
-            {
-                var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo actualizar la lista." : apiMsg;
-            }
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
 
-            return RedirectToAction(nameof(GestionListas), new { eleccionId = l.EleccionId });
+            return RedirectToAction(nameof(GestionListas), new { eleccionId = cambios.EleccionId });
         }
 
         [HttpPost]
@@ -356,114 +382,97 @@ namespace SistemaVotoMVC.Controllers
             }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
-            var response = await client.DeleteAsync($"{_endpointListas}/{id}");
+            var resp = await client.DeleteAsync($"{_endpointListas}/{id}");
 
-            if (response.IsSuccessStatusCode)
+            if (resp.IsSuccessStatusCode)
                 TempData["Mensaje"] = "Lista eliminada.";
             else
-            {
-                var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo eliminar la lista." : apiMsg;
-            }
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
 
             return RedirectToAction(nameof(GestionListas), new { eleccionId });
         }
 
         // CANDIDATOS
+
         [HttpGet]
         public async Task<IActionResult> GestionCandidatos(int eleccionId)
         {
             if (eleccionId <= 0)
             {
-                TempData["Error"] = "Elección inválida.";
+                TempData["Error"] = "Elección no válida.";
                 return RedirectToAction(nameof(GestionElecciones));
             }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
-            var respEleccion = await client.GetAsync($"{_endpointElecciones}/{eleccionId}");
-            if (!respEleccion.IsSuccessStatusCode)
-            {
-                TempData["Error"] = "Elección no encontrada.";
-                return RedirectToAction(nameof(GestionElecciones));
-            }
-
-            ViewBag.Eleccion = await respEleccion.Content.ReadFromJsonAsync<Eleccion>();
+            var respElec = await client.GetAsync($"{_endpointElecciones}/{eleccionId}");
+            ViewBag.Eleccion = respElec.IsSuccessStatusCode
+                ? await respElec.Content.ReadFromJsonAsync<Eleccion>()
+                : null;
 
             var respListas = await client.GetAsync($"{_endpointListas}/PorEleccion/{eleccionId}");
-            var listas = respListas.IsSuccessStatusCode
+            ViewBag.Listas = respListas.IsSuccessStatusCode
                 ? await respListas.Content.ReadFromJsonAsync<List<Lista>>() ?? new List<Lista>()
                 : new List<Lista>();
 
-            ViewBag.Listas = listas;
-
-            var respCand = await client.GetAsync($"{_endpointCandidatos}/PorEleccion/{eleccionId}");
-            var candidatos = respCand.IsSuccessStatusCode
-                ? await respCand.Content.ReadFromJsonAsync<List<Candidato>>() ?? new List<Candidato>()
+            var resp = await client.GetAsync($"{_endpointCandidatos}/PorEleccion/{eleccionId}");
+            var candidatos = resp.IsSuccessStatusCode
+                ? await resp.Content.ReadFromJsonAsync<List<Candidato>>() ?? new List<Candidato>()
                 : new List<Candidato>();
 
-            if (!respCand.IsSuccessStatusCode)
-                TempData["Error"] = "No se pudo obtener los candidatos de la elección.";
+            if (!resp.IsSuccessStatusCode)
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
 
             return View(candidatos);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CrearCandidato(Candidato c)
+        public async Task<IActionResult> CrearCandidato(Candidato candidato)
         {
-            if (c == null || c.EleccionId <= 0 || c.ListaId <= 0 ||
-                string.IsNullOrWhiteSpace(c.Cedula) || string.IsNullOrWhiteSpace(c.RolPostulante))
+            if (candidato == null || candidato.EleccionId <= 0)
             {
                 TempData["Error"] = "Datos inválidos.";
                 return RedirectToAction(nameof(GestionElecciones));
             }
 
-            c.Cedula = c.Cedula.Trim();
-            c.RolPostulante = c.RolPostulante.Trim();
+            candidato.Cedula = (candidato.Cedula ?? "").Trim();
+            candidato.RolPostulante = (candidato.RolPostulante ?? "").Trim();
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
-            var response = await client.PostAsJsonAsync(_endpointCandidatos, c);
+            var resp = await client.PostAsJsonAsync(_endpointCandidatos, candidato);
 
-            if (response.IsSuccessStatusCode)
+            if (resp.IsSuccessStatusCode)
                 TempData["Mensaje"] = "Candidato registrado.";
             else
-            {
-                var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo crear el candidato." : apiMsg;
-            }
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
 
-            return RedirectToAction(nameof(GestionCandidatos), new { eleccionId = c.EleccionId });
+            return RedirectToAction(nameof(GestionCandidatos), new { eleccionId = candidato.EleccionId });
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditarCandidato(int id, int eleccionId, int listaId, string rolPostulante)
         {
-            if (id <= 0 || eleccionId <= 0 || listaId <= 0 || string.IsNullOrWhiteSpace(rolPostulante))
+            if (id <= 0 || eleccionId <= 0)
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction(nameof(GestionCandidatos), new { eleccionId });
+                return RedirectToAction(nameof(GestionElecciones));
             }
 
             var cambios = new Candidato
             {
-                Id = id,
-                EleccionId = eleccionId,
                 ListaId = listaId,
-                RolPostulante = rolPostulante.Trim()
+                RolPostulante = (rolPostulante ?? "").Trim()
             };
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
-            var response = await client.PutAsJsonAsync($"{_endpointCandidatos}/{id}", cambios);
+            var resp = await client.PutAsJsonAsync($"{_endpointCandidatos}/{id}", cambios);
 
-            if (response.IsSuccessStatusCode)
+            if (resp.IsSuccessStatusCode)
                 TempData["Mensaje"] = "Candidato actualizado.";
             else
-            {
-                var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo actualizar el candidato." : apiMsg;
-            }
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
 
             return RedirectToAction(nameof(GestionCandidatos), new { eleccionId });
         }
@@ -475,21 +484,71 @@ namespace SistemaVotoMVC.Controllers
             if (id <= 0 || eleccionId <= 0)
             {
                 TempData["Error"] = "Datos inválidos.";
-                return RedirectToAction(nameof(GestionCandidatos), new { eleccionId });
+                return RedirectToAction(nameof(GestionElecciones));
             }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
-            var response = await client.DeleteAsync($"{_endpointCandidatos}/{id}");
+            var resp = await client.DeleteAsync($"{_endpointCandidatos}/{id}");
 
-            if (response.IsSuccessStatusCode)
+            if (resp.IsSuccessStatusCode)
                 TempData["Mensaje"] = "Candidato eliminado.";
             else
-            {
-                var apiMsg = await response.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(apiMsg) ? "No se pudo eliminar el candidato." : apiMsg;
-            }
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
 
             return RedirectToAction(nameof(GestionCandidatos), new { eleccionId });
         }
+        [HttpGet]
+        public async Task<IActionResult> VerificarJuntas(int? eleccionId)
+        {
+            var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
+
+            var respElec = await client.GetAsync(_endpointElecciones);
+            var elecciones = respElec.IsSuccessStatusCode
+                ? await respElec.Content.ReadFromJsonAsync<List<Eleccion>>() ?? new List<Eleccion>()
+                : new List<Eleccion>();
+
+            ViewBag.Elecciones = elecciones;
+
+            if (eleccionId == null || eleccionId <= 0)
+            {
+                var activa = elecciones.FirstOrDefault(e => e.Estado == "ACTIVA");
+                eleccionId = activa?.Id ?? elecciones.OrderByDescending(x => x.Id).FirstOrDefault()?.Id ?? 0;
+            }
+
+            ViewBag.EleccionId = eleccionId ?? 0;
+
+            if ((eleccionId ?? 0) <= 0)
+            {
+                TempData["Error"] = "No hay elecciones disponibles.";
+                return View(new List<JuntaDetalleDto>());
+            }
+
+            var respJuntas = await client.GetAsync($"{_endpointJuntas}/PorEleccion/{eleccionId}");
+            var juntas = respJuntas.IsSuccessStatusCode
+                ? await respJuntas.Content.ReadFromJsonAsync<List<JuntaDetalleDto>>() ?? new List<JuntaDetalleDto>()
+                : new List<JuntaDetalleDto>();
+
+            if (!respJuntas.IsSuccessStatusCode)
+                TempData["Error"] = await respJuntas.Content.ReadAsStringAsync();
+
+            return View(juntas);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> AprobarJuntaVerificada(long id, int eleccionId)
+        {
+            var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
+
+            var resp = await client.PutAsync($"{_endpointJuntas}/AprobarJunta/{id}", null);
+
+            if (resp.IsSuccessStatusCode)
+                TempData["Mensaje"] = "Junta aprobada.";
+            else
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
+
+            return RedirectToAction(nameof(VerificarJuntas), new { eleccionId });
+        }
+
     }
 }
