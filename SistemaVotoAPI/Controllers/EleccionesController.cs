@@ -97,6 +97,12 @@ namespace SistemaVotoAPI.Controllers
             var existente = await _context.Elecciones.FindAsync(id);
             if (existente == null) return NotFound();
 
+            // Si la fecha actual es igual o mayor a la fecha de inicio guardada, se bloquea la edición.
+            if (DateTime.Now >= existente.FechaInicio)
+            {
+                return BadRequest("No se puede editar una elección que ya ha comenzado o que ya finalizó.");
+            }
+
             var titulo = (eleccion.Titulo ?? "").Trim();
             if (string.IsNullOrWhiteSpace(titulo))
                 return BadRequest("El título es obligatorio.");

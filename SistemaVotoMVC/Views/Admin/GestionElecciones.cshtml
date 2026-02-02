@@ -49,7 +49,7 @@
                     @foreach (var e in Model)
                     {
                         string badge = e.Estado == "ACTIVA" ? "bg-success"
-                        : e.Estado == "FINALIZADA" ? "bg-secondary"
+                        : e.Estado == "FIN DE LA ELECCION" ? "bg-secondary"
                         : "bg-warning text-dark";
 
                         <tr>

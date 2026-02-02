@@ -57,7 +57,8 @@ namespace SistemaVotoAPI.Controllers
             return cambio;
         }
 
-        private static JuntaDetalleDto Mapear(Junta j)
+        // Método Mapear actualizado con los nuevos campos de estadísticas
+        private static JuntaDetalleDto Mapear(Junta j, int total, int votaron, int noVotaron, int digitales)
         {
             return new JuntaDetalleDto
             {
@@ -71,7 +72,13 @@ namespace SistemaVotoAPI.Controllers
                 NombreJefe = j.JefeDeJunta != null
                     ? j.JefeDeJunta.NombreCompleto ?? "Nombre vacío"
                     : (string.IsNullOrWhiteSpace(j.JefeDeJuntaId) ? "Sin asignar" : $"Cédula: {j.JefeDeJuntaId}"),
-                EstadoJunta = j.Estado
+                EstadoJunta = j.Estado,
+
+                // Nuevas columnas para la vista de verificación
+                TotalVotantes = total,
+                Votaron = votaron,
+                NoVotaron = noVotaron,
+                VotosDigitales = digitales
             };
         }
 
@@ -97,12 +104,59 @@ namespace SistemaVotoAPI.Controllers
             if (huboCambios)
                 await _context.SaveChangesAsync();
 
-            var respuesta = juntasLista
-                .Select(Mapear)
-                .OrderBy(x => x.Id)
-                .ToList();
+            var respuesta = new List<JuntaDetalleDto>();
+            foreach (var j in juntasLista)
+            {
+                // Cálculos estadísticos por cada mesa
+                int total = await _context.Votantes.CountAsync(v => v.JuntaId == j.Id);
+                int si = await _context.Votantes.CountAsync(v => v.JuntaId == j.Id && v.HaVotado);
+                int no = total - si;
+                int digitales = await _context.VotosAnonimos.CountAsync(v =>
+                    v.EleccionId == j.EleccionId && v.DireccionId == j.DireccionId && v.NumeroMesa == j.NumeroMesa);
 
-            return Ok(respuesta);
+                respuesta.Add(Mapear(j, total, si, no, digitales));
+            }
+
+            return Ok(respuesta.OrderBy(x => x.Id).ToList());
+        }
+
+        [HttpGet("PorEleccion/{eleccionId:int}")]
+        public async Task<ActionResult<IEnumerable<JuntaDetalleDto>>> GetJuntasPorEleccion(int eleccionId)
+        {
+            var ahora = DateTime.Now;
+
+            var juntasLista = await _context.Juntas
+                .Where(j => j.EleccionId == eleccionId)
+                .Include(j => j.Eleccion)
+                .Include(j => j.Direccion)
+                .Include(j => j.JefeDeJunta)
+                .ToListAsync();
+
+            bool huboCambios = false;
+
+            foreach (var j in juntasLista)
+            {
+                if (AplicarTransicionEstado(j, ahora))
+                    huboCambios = true;
+            }
+
+            if (huboCambios)
+                await _context.SaveChangesAsync();
+
+            var respuesta = new List<JuntaDetalleDto>();
+            foreach (var j in juntasLista)
+            {
+                // Cálculos estadísticos filtrados por la elección específica
+                int total = await _context.Votantes.CountAsync(v => v.JuntaId == j.Id);
+                int si = await _context.Votantes.CountAsync(v => v.JuntaId == j.Id && v.HaVotado);
+                int no = total - si;
+                int digitales = await _context.VotosAnonimos.CountAsync(v =>
+                    v.EleccionId == eleccionId && v.DireccionId == j.DireccionId && v.NumeroMesa == j.NumeroMesa);
+
+                respuesta.Add(Mapear(j, total, si, no, digitales));
+            }
+
+            return Ok(respuesta.OrderBy(x => x.NumeroMesa).ToList());
         }
 
         [HttpPut("AsignarJefe")]
@@ -216,37 +270,6 @@ namespace SistemaVotoAPI.Controllers
                 return NotFound("Tu junta asignada pertenece a otra elección.");
 
             return Ok(junta);
-        }
-
-        [HttpGet("PorEleccion/{eleccionId:int}")]
-        public async Task<ActionResult<IEnumerable<JuntaDetalleDto>>> GetJuntasPorEleccion(int eleccionId)
-        {
-            var ahora = DateTime.Now;
-
-            var juntasLista = await _context.Juntas
-                .Where(j => j.EleccionId == eleccionId)
-                .Include(j => j.Eleccion)
-                .Include(j => j.Direccion)
-                .Include(j => j.JefeDeJunta)
-                .ToListAsync();
-
-            bool huboCambios = false;
-
-            foreach (var j in juntasLista)
-            {
-                if (AplicarTransicionEstado(j, ahora))
-                    huboCambios = true;
-            }
-
-            if (huboCambios)
-                await _context.SaveChangesAsync();
-
-            var respuesta = juntasLista
-                .Select(Mapear)
-                .OrderBy(x => x.NumeroMesa)
-                .ToList();
-
-            return Ok(respuesta);
         }
     }
 }
