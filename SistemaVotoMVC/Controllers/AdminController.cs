@@ -549,6 +549,20 @@ namespace SistemaVotoMVC.Controllers
 
             return RedirectToAction(nameof(VerificarJuntas), new { eleccionId });
         }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> EliminarEleccionForzada(int id)
+        {
+            var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
+            var resp = await client.DeleteAsync($"{_endpointElecciones}/{id}/Forzar");
+
+            if (resp.IsSuccessStatusCode)
+                TempData["Mensaje"] = "Elección eliminada con todo lo asociado.";
+            else
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
+
+            return RedirectToAction(nameof(GestionElecciones));
+        }
 
     }
 }

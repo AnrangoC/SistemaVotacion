@@ -61,7 +61,6 @@
 
                             <td class="text-end">
                                 <div class="btn-group" role="group">
-                                    <!-- EDITAR: uso data-* para no romper por comillas -->
                                     <button class="btn btn-outline-primary btn-sm"
                                             type="button"
                                             data-id="@e.Id"
@@ -96,6 +95,17 @@
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
+
+                                    <form asp-controller="Admin"
+                                          asp-action="EliminarEleccionForzada"
+                                          method="post"
+                                          onsubmit="return confirm('Esta acción eliminará juntas, listas, candidatos y votos asociados.\n\n¿Eliminar la elección de todas formas?');">
+                                        @Html.AntiForgeryToken()
+                                        <input type="hidden" name="id" value="@e.Id" />
+                                        <button class="btn btn-danger btn-sm" type="submit" title="Eliminar de todas formas">
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -106,7 +116,6 @@
     </div>
 </div>
 
-<!-- MODAL NUEVA -->
 <div class="modal fade" id="modalNueva" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <form asp-controller="Admin" asp-action="CrearEleccion" method="post" class="modal-content">
@@ -138,7 +147,6 @@
     </div>
 </div>
 
-<!-- MODAL EDITAR -->
 <div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
         <form asp-controller="Admin" asp-action="EditarEleccion" method="post" class="modal-content">

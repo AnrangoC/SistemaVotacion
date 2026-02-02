@@ -113,27 +113,28 @@ namespace SistemaVotoAPI.Controllers
         public async Task<IActionResult> PutVotante(string cedula, Votante votante)
         {
             if (cedula != votante.Cedula)
-                return BadRequest();
+                return BadRequest("La cédula no coincide.");
 
+            // Buscamos el registro real que está en la base de datos para comparar
             var existente = await _context.Votantes.FindAsync(cedula);
             if (existente == null)
-                return NotFound();
+                return NotFound("El votante no existe.");
 
-            /*
-             Lógica de negocio
-             No se permite asignar rol de administrador o jefe de junta
-             a una persona que ya es candidata
-            */
-            if (votante.RolId != existente.RolId &&
-                (votante.RolId == 1 || votante.RolId == 3))
+            // LOGICA DE PROTECCIÓN DE CONTRASEÑA
+            // Si el campo Password viene vacío o es exactamente igual al hash que ya tenemos,
+            // significa que no queremos cambiar la contraseña.
+            if (string.IsNullOrWhiteSpace(votante.Password) || votante.Password == existente.Password)
             {
-                bool esCandidato = await _context.Candidatos
-                    .AnyAsync(c => c.Cedula == cedula);
-
-                if (esCandidato)
-                    return Conflict("Un candidato no puede ser administrador ni jefe de junta.");
+                // No tocamos la contraseña existente
+            }
+            else
+            {
+                // Si el texto es diferente y no está vacío, asumimos que es una clave nueva
+                // y procedemos a encriptarla.
+                existente.Password = PasswordHasher.Hash(votante.Password.Trim());
             }
 
+            // Actualizamos el resto de los campos normales
             existente.NombreCompleto = votante.NombreCompleto;
             existente.Email = votante.Email;
             existente.FotoUrl = votante.FotoUrl;
@@ -141,17 +142,22 @@ namespace SistemaVotoAPI.Controllers
             existente.Estado = votante.Estado;
             existente.JuntaId = votante.JuntaId;
 
-            /*
-             Lógica de seguridad
-             Solo se vuelve a hashear la contraseña si se envía una nueva
-            */
-            if (!string.IsNullOrWhiteSpace(votante.Password))
+            try
             {
-                existente.Password = PasswordHasher.Hash(votante.Password);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!VotanteExists(cedula)) return NotFound();
+                else throw;
             }
 
-            await _context.SaveChangesAsync();
             return NoContent();
+        }
+        private bool VotanteExists(string cedula)
+        {
+            // Verifica en la base de datos si existe algún registro con esa cédula
+            return _context.Votantes.Any(e => e.Cedula == cedula);
         }
 
         // DELETE: api/Votantes/0102030405

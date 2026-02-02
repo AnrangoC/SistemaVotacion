@@ -42,7 +42,8 @@
             <select name="eleccionId" class="form-select" required>
                 @foreach (var e in elecciones)
                 {
-                    <option value="@e.Id" selected="@(e.Id == eleccionId)">
+                    <option value="@e.Id"
+                            selected="@(e.Id==eleccionId)">
                         #@e.Id - @e.Titulo (@e.Estado)
                     </option>
                 }

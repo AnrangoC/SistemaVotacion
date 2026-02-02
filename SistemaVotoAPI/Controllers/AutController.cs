@@ -58,7 +58,7 @@ namespace SistemaVotoAPI.Controllers
             return Ok(response);
         }
 
-        // DTO interno SOLO para soportar envío por body si algún día lo usas desde Swagger/Postman
+        // DTO interno SOLO para soportar envío por body si algún día se usas desde Swagger/Postman
         public class GenerarTokenRequest
         {
             public string CedulaJefe { get; set; } = string.Empty;

@@ -20,7 +20,6 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // Helpers
         private static string CalcularEstado(Eleccion e, DateTime now)
         {
             if (now < e.FechaInicio) return "CONFIGURACION";
@@ -28,7 +27,6 @@ namespace SistemaVotoAPI.Controllers
             return "FINALIZADA";
         }
 
-        // GET: api/Elecciones
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Eleccion>>> GetEleccion()
         {
@@ -52,7 +50,6 @@ namespace SistemaVotoAPI.Controllers
             return elecciones;
         }
 
-        // GET: api/Elecciones/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Eleccion>> GetEleccion(int id)
         {
@@ -71,7 +68,6 @@ namespace SistemaVotoAPI.Controllers
             return eleccion;
         }
 
-        // POST: api/Elecciones
         [HttpPost]
         public async Task<ActionResult<Eleccion>> PostEleccion(Eleccion eleccion)
         {
@@ -84,7 +80,6 @@ namespace SistemaVotoAPI.Controllers
             if (eleccion.FechaFin <= eleccion.FechaInicio)
                 return BadRequest("La fecha/hora fin debe ser mayor que la fecha/hora inicio.");
 
-            // Estado siempre lo define el sistema
             eleccion.Estado = "CONFIGURACION";
 
             _context.Elecciones.Add(eleccion);
@@ -93,7 +88,6 @@ namespace SistemaVotoAPI.Controllers
             return CreatedAtAction(nameof(GetEleccion), new { id = eleccion.Id }, eleccion);
         }
 
-        // PUT: api/Elecciones/5
         [HttpPut("{id}")]
         public async Task<IActionResult> PutEleccion(int id, Eleccion eleccion)
         {
@@ -113,15 +107,12 @@ namespace SistemaVotoAPI.Controllers
             existente.Titulo = titulo;
             existente.FechaInicio = eleccion.FechaInicio;
             existente.FechaFin = eleccion.FechaFin;
-
-            // Estado se recalcula solo
             existente.Estado = CalcularEstado(existente, DateTime.Now);
 
             await _context.SaveChangesAsync();
             return NoContent();
         }
 
-        // DELETE: api/Elecciones/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteEleccion(int id)
         {
@@ -129,10 +120,73 @@ namespace SistemaVotoAPI.Controllers
             if (eleccion == null) return NotFound();
 
             _context.Elecciones.Remove(eleccion);
-            await _context.SaveChangesAsync();
-            return NoContent();
+
+            try
+            {
+                await _context.SaveChangesAsync();
+                return NoContent();
+            }
+            catch
+            {
+                return Conflict("No se puede eliminar una elección con datos asociados. Usa /Forzar si deseas borrar todo.");
+            }
         }
-        // GET: api/Elecciones/Activa
+
+        [HttpDelete("{id}/Forzar")]
+        public async Task<IActionResult> DeleteEleccionForzar(int id)
+        {
+            var eleccion = await _context.Elecciones.FindAsync(id);
+            if (eleccion == null) return NotFound("Elección no encontrada.");
+
+            await using var tx = await _context.Database.BeginTransactionAsync();
+
+            try
+            {
+                var juntas = await _context.Juntas
+                    .Where(j => j.EleccionId == id)
+                    .ToListAsync();
+
+                var juntaIds = juntas.Select(j => j.Id).ToList(); // Cambiado de (int)j.Id a j.Id
+
+
+                var votos = await _context.VotosAnonimos
+                    .Where(v => v.EleccionId == id)
+                    .ToListAsync();
+
+                var votantesDeEsaEleccion = await _context.Votantes
+                    .Where(v => v.JuntaId.HasValue && juntaIds.Contains(v.JuntaId.Value))
+                    .ToListAsync();
+
+                foreach (var v in votantesDeEsaEleccion)
+                    v.HaVotado = false;
+
+                _context.VotosAnonimos.RemoveRange(votos);
+
+                var candidatos = await _context.Candidatos
+                    .Where(c => c.EleccionId == id)
+                    .ToListAsync();
+                _context.Candidatos.RemoveRange(candidatos);
+
+                var listas = await _context.Listas
+                    .Where(l => l.EleccionId == id)
+                    .ToListAsync();
+                _context.Listas.RemoveRange(listas);
+
+                _context.Juntas.RemoveRange(juntas);
+                _context.Elecciones.Remove(eleccion);
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                return Ok("Elección eliminada junto con sus votos, listas, candidatos y juntas asociadas.");
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                return StatusCode(500, "No se pudo realizar el borrado forzado. Revisa las relaciones en la base de datos.");
+            }
+        }
+
         [HttpGet("Activa")]
         public async Task<IActionResult> GetEleccionActiva()
         {
@@ -148,7 +202,5 @@ namespace SistemaVotoAPI.Controllers
 
             return Ok(eleccion);
         }
-
     }
 }
-
