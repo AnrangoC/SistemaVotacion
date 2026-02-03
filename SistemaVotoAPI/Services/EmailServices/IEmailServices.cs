@@ -1,10 +1,11 @@
 ﻿using SistemaVotoAPI.Models;
+using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Services.EmailServices
 {
     public interface IEmailServices
     {
-        void SendEmail(EmailDto request);
+        Task SendEmail(EmailDto request);
 
     }
 }

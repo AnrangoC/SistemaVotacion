@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using MimeKit;
 using MimeKit.Text;
 using SistemaVotoAPI.Models;
+using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Services.EmailServices
 {
@@ -17,7 +18,7 @@ namespace SistemaVotoAPI.Services.EmailServices
         {
             _config = config;
         }
-        public void SendEmail(EmailDto request)
+        public async Task SendEmail(EmailDto request)  // Cambiado a Task
         {
             var email = new MimeMessage();
             email.From.Add(MailboxAddress.Parse(_config.GetSection("EmailUsername").Value));
@@ -28,7 +29,7 @@ namespace SistemaVotoAPI.Services.EmailServices
             using var smtp = new SmtpClient();
             smtp.Connect(_config.GetSection("EmailHost").Value, 587, SecureSocketOptions.StartTls);
             smtp.Authenticate(_config.GetSection("EmailUsername").Value, _config.GetSection("EmailPassword").Value);
-            smtp.Send(email);
+            await smtp.SendAsync(email);  // Asegúrate de que esto también sea async
             smtp.Disconnect(true);
         }
     }

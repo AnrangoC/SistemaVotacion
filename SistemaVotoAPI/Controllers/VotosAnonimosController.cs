@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
+using SistemaVotoAPI.Models;
+using SistemaVotoAPI.Services.EmailServices;
 using SistemaVotoModelos;
 using System;
 using System.Threading.Tasks;
@@ -12,10 +14,12 @@ namespace SistemaVotoAPI.Controllers
     public class VotosAnonimosController : ControllerBase
     {
         private readonly APIVotosDbContext _context;
+        private readonly IEmailServices _emailServices;
 
-        public VotosAnonimosController(APIVotosDbContext context)
+        public VotosAnonimosController(APIVotosDbContext context, IEmailServices emailServices)
         {
             _context = context;
+            _emailServices = emailServices;  // Asegúrate de que la inyección de dependencias esté aquí.
         }
 
         // El token se usa solo para ingresar al sistema en el cliente MVC
@@ -78,6 +82,35 @@ namespace SistemaVotoAPI.Controllers
 
             _context.VotosAnonimos.Add(voto);
             await _context.SaveChangesAsync();
+
+            // Obtener el correo del votante
+            if (string.IsNullOrEmpty(votante.Email))
+                return BadRequest("El votante no tiene un correo electrónico registrado.");
+
+            // Crear el mensaje de correo
+            var emailMessage = new EmailDto
+            {
+                To = votante.Email,  // El correo electrónico del votante
+                Subject = "Voto Anónimo Registrado",
+                Body = $@"
+                El votante con cédula: {cedula} ha emitido su voto de manera anónima para la elección con ID {request.EleccionId}.
+
+                Detalles del voto:
+                - Fecha y hora del voto: {voto.FechaVoto}
+                - Mesa de votación: {junta.NumeroMesa}
+                - Lista votada: {request.ListaId} (0 indica voto en blanco)
+                 - Cédula del candidato: {request.CedulaCandidato} (si aplica)
+                - Rol del postulante: {request.RolPostulante} (si aplica)
+
+                Estado del votante:
+                - Votante activo: {votante.Estado}
+                - Votante ya votó: {votante.HaVotado}
+
+                La junta asociada al votante tiene el estado: {junta.Estado} (solo se permite votar si la junta está abierta)."
+            };
+
+            // Enviar el correo con el servicio
+            await _emailServices.SendEmail(emailMessage);
 
             return Ok("Voto registrado correctamente.");
         }
