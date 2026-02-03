@@ -142,7 +142,7 @@ namespace SistemaVotoAPI.Controllers
         public async Task<IActionResult> DeleteEleccionForzar(int id)
         {
             var eleccion = await _context.Elecciones.FindAsync(id);
-            if (eleccion == null) return NotFound("Elección no encontrada.");
+            if (eleccion == null) return NotFound("Elección no encontrada en la base de datos.");
 
             await using var tx = await _context.Database.BeginTransactionAsync();
 
