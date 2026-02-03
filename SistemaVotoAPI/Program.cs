@@ -1,14 +1,14 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿// Nuevo
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-using SistemaVotoAPI.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
+using SistemaVotoAPI.Data;
+using SistemaVotoAPI.Services.EmailServices;
 using System;
-
-// Nuevo
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.DataProtection;
 using System.IO;
 
 // Configuración global para compatibilidad con fechas en PostgreSQL
@@ -89,6 +89,10 @@ builder.Services.AddControllers()
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+
+//Servicio de envío de correos electrónicos
+builder.Services.AddScoped<IEmailServices, EmailServices>();
 
 var app = builder.Build();
 
