@@ -59,10 +59,6 @@ namespace SistemaVotoAPI.Controllers
             if (junta == null)
                 return BadRequest("No se encontró la junta del votante.");
 
-            // REGLA DE NEGOCIO: Solo se permite votar si la junta está en estado 2 (Abierta)
-            if (junta.Estado != 2)
-                return BadRequest("La junta no se encuentra abierta para recibir sufragios.");
-
             // 4. Crear el registro de voto anónimo
             var voto = new VotoAnonimo
             {
