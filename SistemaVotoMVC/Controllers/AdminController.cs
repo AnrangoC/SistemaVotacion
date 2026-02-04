@@ -414,6 +414,16 @@ namespace SistemaVotoMVC.Controllers
             ViewBag.Listas = respListas.IsSuccessStatusCode
                 ? await respListas.Content.ReadFromJsonAsync<List<Lista>>() ?? new List<Lista>()
                 : new List<Lista>();
+            // VOTANTES CANDIDATABLES (solo rol 2 osea solo los votantes)
+            var respVotantes = await client.GetAsync(_endpointVotantes);
+            var votantes = respVotantes.IsSuccessStatusCode
+                ? await respVotantes.Content.ReadFromJsonAsync<List<Votante>>() ?? new List<Votante>()
+                : new List<Votante>();
+
+            ViewBag.VotantesCandidatables = votantes
+                .Where(v => v.RolId == 2 && v.Estado)
+                .OrderBy(v => v.NombreCompleto)
+                .ToList();
 
             var resp = await client.GetAsync($"{_endpointCandidatos}/PorEleccion/{eleccionId}");
             var candidatos = resp.IsSuccessStatusCode

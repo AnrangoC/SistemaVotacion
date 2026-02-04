@@ -14,7 +14,7 @@
             <strong>@(eleccion?.Titulo ?? "Elección")</strong>
             —
             <span class="badge @(eleccion?.Estado == "CONFIGURACION" ? "bg-warning text-dark" :
-                                                  eleccion?.Estado == "ACTIVA" ? "bg-success" : "bg-secondary")">
+                                                                    eleccion?.Estado == "ACTIVA" ? "bg-success" : "bg-secondary")">
                 @(eleccion?.Estado ?? "-")
             </span>
         </div>
@@ -58,12 +58,12 @@
                     <tr>
                         <th style="width:90px;">Id</th>
                         <th>Nombre</th>
-                        <th>Logo</th>
+                        <th style="width:120px;">Logo</th>
                         <th style="width:200px;">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @if (!Model.Any())
+                    @if (Model == null || !Model.Any())
                     {
                         <tr>
                             <td colspan="4" class="text-center text-muted py-4">
@@ -78,16 +78,27 @@
                             <tr>
                                 <td>@l.Id</td>
                                 <td>@l.NombreLista</td>
+
                                 <td>
                                     @if (!string.IsNullOrWhiteSpace(l.LogoUrl))
                                     {
-                                        <a href="@l.LogoUrl" target="_blank">Ver logo</a>
+                                        <a href="@l.LogoUrl" target="_blank" title="Abrir logo en otra pestaña">
+                                            <img src="@l.LogoUrl"
+                                                 alt="Logo"
+                                                 style="width:60px;height:60px;object-fit:contain;"
+                                                 onerror="this.style.display='none';" />
+                                        </a>
+
+                                        <div class="small text-muted mt-1">
+                                            <a href="@l.LogoUrl" target="_blank">Abrir</a>
+                                        </div>
                                     }
                                     else
                                     {
                                         <span class="text-muted">Sin logo</span>
                                     }
                                 </td>
+
                                 <td class="d-flex gap-2">
                                     <button class="btn btn-info btn-sm text-white"
                                             onclick="abrirEditar('@l.Id','@Html.Raw(l.NombreLista.Replace("'", "\\'"))','@Html.Raw((l.LogoUrl ?? "").Replace("'", "\\'"))')"
@@ -133,7 +144,14 @@
                 <input name="nombreLista" class="form-control mb-3" required />
 
                 <label class="fw-bold">Logo URL (opcional)</label>
-                <input name="logoUrl" class="form-control" />
+                <input name="logoUrl" id="logoNuevo" class="form-control"
+                       placeholder="https://..."
+                       oninput="previewLogo(this.value, 'previewLogoNuevo')" />
+
+                <img id="previewLogoNuevo"
+                     class="mt-2"
+                     style="width:120px;height:120px;object-fit:contain;display:none;"
+                     alt="Preview logo" />
             </div>
 
             <div class="modal-footer">
@@ -162,7 +180,14 @@
                 <input name="NombreLista" id="editNombre" class="form-control mb-3" required />
 
                 <label class="fw-bold">Logo URL</label>
-                <input name="LogoUrl" id="editLogo" class="form-control" />
+                <input name="LogoUrl" id="editLogo" class="form-control"
+                       placeholder="https://..."
+                       oninput="previewLogo(this.value, 'previewLogoEditar')" />
+
+                <img id="previewLogoEditar"
+                     class="mt-2"
+                     style="width:120px;height:120px;object-fit:contain;display:none;"
+                     alt="Preview logo" />
             </div>
 
             <div class="modal-footer">
@@ -179,7 +204,38 @@
             document.getElementById("editNombre").value = nombre || "";
             document.getElementById("editLogo").value = logo || "";
 
+            // preview al abrir el modal
+            previewLogo(logo || "", "previewLogoEditar");
+
             new bootstrap.Modal(document.getElementById("modalEditarLista")).show();
+        }
+
+        function previewLogo(url, imgId) {
+            const img = document.getElementById(imgId);
+            if (!img) return;
+
+            if (!url || url.trim() === "") {
+                img.style.display = "none";
+                img.src = "";
+                return;
+            }
+
+            img.src = url;
+            img.style.display = "";
+
+            img.onerror = () => {
+                img.style.display = "none";
+                img.src = "";
+            };
+        }
+        // opcional para cuando abrea el modal nuevo, limpia preview
+        const modalNueva = document.getElementById("modalNuevaLista");
+        if (modalNueva) {
+            modalNueva.addEventListener("show.bs.modal", function () {
+                const input = document.getElementById("logoNuevo");
+                if (input) input.value = "";
+                previewLogo("", "previewLogoNuevo");
+            });
         }
     </script>
 }

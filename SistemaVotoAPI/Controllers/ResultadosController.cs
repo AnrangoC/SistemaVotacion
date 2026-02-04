@@ -56,7 +56,7 @@ namespace SistemaVotoAPI.Controllers
 
                 resultadosFinales.Add(new
                 {
-                    NombreLista = lista?.NombreLista ?? "Otros/Votos Nulos",
+                    NombreLista = lista?.NombreLista ?? "Otros/Votos en Blanco",
                     Logo = lista?.LogoUrl,
                     Votos = item.TotalVotos,
                     Porcentaje = Math.Round(porcentaje, 2)
@@ -132,7 +132,7 @@ namespace SistemaVotoAPI.Controllers
 
                 resultadosFinales.Add(new
                 {
-                    NombreLista = lista?.NombreLista ?? "Otros/Votos Nulos",
+                    NombreLista = lista?.NombreLista ?? "Otros/Votos en Blanco",
                     Logo = lista?.LogoUrl,
                     Votos = item.TotalVotos,
                     Porcentaje = Math.Round(porcentaje, 2)

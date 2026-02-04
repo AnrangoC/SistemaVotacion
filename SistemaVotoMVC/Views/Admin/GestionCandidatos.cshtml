@@ -4,6 +4,9 @@
     ViewData["Title"] = "Gestión de Candidatos";
     var eleccion = ViewBag.Eleccion as SistemaVotoModelos.Eleccion;
     var listas = ViewBag.Listas as List<SistemaVotoModelos.Lista> ?? new List<SistemaVotoModelos.Lista>();
+
+    var votantesCandidatables = ViewBag.VotantesCandidatables as List<SistemaVotoModelos.Votante>
+        ?? new List<SistemaVotoModelos.Votante>();
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -138,10 +141,33 @@
             <div class="modal-body">
                 <input type="hidden" name="EleccionId" value="@(eleccion?.Id ?? 0)" />
 
-                <label class="fw-bold">Cédula</label>
-                <input name="Cedula" class="form-control mb-3" maxlength="10" required placeholder="0102030405" />
+                <label class="fw-bold">Votante (solo rol 2)</label>
+                <select name="Cedula" id="selectVotante" class="form-select mb-2" required onchange="previewVotante()">
+                    <option value="">-- Selecciona un votante --</option>
 
-                <label class="fw-bold">Lista</label>
+                    @foreach (var v in votantesCandidatables)
+                    {
+                        <option value="@v.Cedula" data-foto="@v.FotoUrl" data-nombre="@v.NombreCompleto">
+                            @v.NombreCompleto - @v.Cedula
+                        </option>
+                    }
+                </select>
+
+                <div class="d-flex align-items-center gap-2 mt-2">
+                    <img id="previewFotoVotante"
+                         class="rounded-circle"
+                         style="width:48px;height:48px;object-fit:cover;display:none;"
+                         src=""
+                         alt="Foto"
+                         onerror="this.style.display='none';" />
+
+                    <div>
+                        <div id="previewNombreVotante" class="fw-semibold"></div>
+                        <div id="previewCedulaVotante" class="text-muted small"></div>
+                    </div>
+                </div>
+
+                <label class="fw-bold mt-3">Lista</label>
                 <select name="ListaId" class="form-select mb-3" required>
                     <option value="">-- Selecciona una lista --</option>
                     @foreach (var l in listas)
@@ -204,6 +230,28 @@
             document.getElementById("editRol").value = rolPostulante;
 
             new bootstrap.Modal(document.getElementById("modalEditar")).show();
+        }
+
+        function previewVotante() {
+            const sel = document.getElementById("selectVotante");
+            if (!sel) return;
+
+            const opt = sel.options[sel.selectedIndex];
+            const nombre = opt?.getAttribute("data-nombre") || "";
+            const foto = opt?.getAttribute("data-foto") || "";
+            const cedula = sel.value || "";
+
+            document.getElementById("previewNombreVotante").innerText = nombre;
+            document.getElementById("previewCedulaVotante").innerText = cedula;
+
+            const img = document.getElementById("previewFotoVotante");
+            if (foto && foto.trim() !== "") {
+                img.src = foto;
+                img.style.display = "";
+            } else {
+                img.src = "";
+                img.style.display = "none";
+            }
         }
     </script>
 }

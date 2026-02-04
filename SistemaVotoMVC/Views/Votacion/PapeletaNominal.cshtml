@@ -62,9 +62,21 @@
                                         <div class="fw-bold">@nombre</div>
                                         <div class="text-muted small">Lista: @lista</div>
                                         <div class="text-muted small">Cargo: @cargo</div>
-                                        @if (!string.IsNullOrWhiteSpace(foto))
+                                        @if (c.Votante != null || c.Lista != null)
                                         {
-                                            <div class="text-muted small">@foto</div>
+                                            <div class="d-flex align-items-center gap-2 mb-2">
+                                                @if (!string.IsNullOrWhiteSpace(foto))
+                                                {
+                                                    <img src="@foto" alt="Candidato"
+                                                         style="width: 60px; height: 60px; object-fit: cover; border-radius: 50%; border: 2px solid #eee;" />
+                                                }
+
+                                                @if (c.Lista != null && !string.IsNullOrWhiteSpace(c.Lista.LogoUrl))
+                                                {
+                                                    <img src="@c.Lista.LogoUrl" alt="Logo Lista"
+                                                         style="width: 40px; height: 40px; object-fit: contain;" />
+                                                }
+                                            </div>
                                         }
                                     </div>
                                 </div>

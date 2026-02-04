@@ -103,7 +103,9 @@
                         <div class="col-12 mb-3">
                             <div class="card border-0 shadow-sm p-2">
                                 <div class="d-flex align-items-center mb-1">
-                                    <img src="${item.logo || '/img/voto-default.png'}" width="30" height="30" class="me-2 rounded">
+                                       <img src="${item.logo || '/img/voto-default.png'}"
+                                         style="width:35px; height:35px; object-fit: contain; background-color: #fff;"
+                                         class="me-2 rounded border shadow-sm">
                                     <span class="small fw-bold">${item.nombreLista}</span>
                                     <span class="ms-auto fw-bold text-primary">${item.porcentaje}%</span>
                                 </div>
