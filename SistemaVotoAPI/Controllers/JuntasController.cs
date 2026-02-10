@@ -21,7 +21,7 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // ESTADOS: 1=Cerrada | 2=Abierta | 3=Pendiente de aprobación | 4=Aprobada
+        // ESTADOS: 1=Cerrada | 2=Abierta | 3=Pendiente | 4=Aprobada
 
         private static bool AplicarTransicionEstado(Junta j, DateTime ahora)
         {
@@ -57,7 +57,6 @@ namespace SistemaVotoAPI.Controllers
             return cambio;
         }
 
-        // Método Mapear actualizado con los nuevos campos de estadísticas
         private static JuntaDetalleDto Mapear(Junta j, int total, int votaron, int noVotaron, int digitales)
         {
             return new JuntaDetalleDto
@@ -69,12 +68,15 @@ namespace SistemaVotoAPI.Controllers
                 Ubicacion = j.Direccion == null
                     ? "Sin dirección"
                     : $"{j.Direccion.Provincia} - {j.Direccion.Canton} - {j.Direccion.Parroquia}",
-                NombreJefe = j.JefeDeJunta != null
-                    ? j.JefeDeJunta.NombreCompleto ?? "Nombre vacío"
-                    : (string.IsNullOrWhiteSpace(j.JefeDeJuntaId) ? "Sin asignar" : $"Cédula: {j.JefeDeJuntaId}"),
-                EstadoJunta = j.Estado,
 
-                // Nuevas columnas para la vista de verificación
+                NombreJefe =
+                    j.JefeDeJunta != null
+                        ? j.JefeDeJunta.NombreCompleto
+                        : (!string.IsNullOrWhiteSpace(j.JefeDeJuntaId)
+                            ? $"ID: {j.JefeDeJuntaId}"
+                            : "Sin asignar"),
+
+                EstadoJunta = j.Estado,
                 TotalVotantes = total,
                 Votaron = votaron,
                 NoVotaron = noVotaron,
@@ -102,17 +104,39 @@ namespace SistemaVotoAPI.Controllers
             }
 
             if (huboCambios)
+            {
                 await _context.SaveChangesAsync();
 
+                juntasLista = await _context.Juntas
+                    .Include(j => j.Eleccion)
+                    .Include(j => j.Direccion)
+                    .Include(j => j.JefeDeJunta)
+                    .ToListAsync();
+            }
+
             var respuesta = new List<JuntaDetalleDto>();
+
             foreach (var j in juntasLista)
             {
-                // Cálculos estadísticos por cada mesa
                 int total = await _context.Votantes.CountAsync(v => v.JuntaId == j.Id);
                 int si = await _context.Votantes.CountAsync(v => v.JuntaId == j.Id && v.HaVotado);
                 int no = total - si;
-                int digitales = await _context.VotosAnonimos.CountAsync(v =>
-                    v.EleccionId == j.EleccionId && v.DireccionId == j.DireccionId && v.NumeroMesa == j.NumeroMesa);
+
+                // Calcular cantidad de roles en esa elección
+                var totalRoles = await _context.Candidatos
+                    .Where(c => c.EleccionId == j.EleccionId)
+                    .Select(c => c.RolPostulante)
+                    .Distinct()
+                    .CountAsync();
+
+                // Contar votos reales registrados
+                var votosRaw = await _context.VotosAnonimos.CountAsync(v =>
+                    v.EleccionId == j.EleccionId &&
+                    v.DireccionId == j.DireccionId &&
+                    v.NumeroMesa == j.NumeroMesa);
+
+                // Convertir votos → votantes reales
+                int digitales = totalRoles > 0 ? votosRaw / totalRoles : votosRaw;
 
                 respuesta.Add(Mapear(j, total, si, no, digitales));
             }
@@ -144,14 +168,25 @@ namespace SistemaVotoAPI.Controllers
                 await _context.SaveChangesAsync();
 
             var respuesta = new List<JuntaDetalleDto>();
+
             foreach (var j in juntasLista)
             {
-                // Cálculos estadísticos filtrados por la elección específica
                 int total = await _context.Votantes.CountAsync(v => v.JuntaId == j.Id);
                 int si = await _context.Votantes.CountAsync(v => v.JuntaId == j.Id && v.HaVotado);
                 int no = total - si;
-                int digitales = await _context.VotosAnonimos.CountAsync(v =>
-                    v.EleccionId == eleccionId && v.DireccionId == j.DireccionId && v.NumeroMesa == j.NumeroMesa);
+
+                var totalRoles = await _context.Candidatos
+                    .Where(c => c.EleccionId == eleccionId)
+                    .Select(c => c.RolPostulante)
+                    .Distinct()
+                    .CountAsync();
+
+                var votosRaw = await _context.VotosAnonimos.CountAsync(v =>
+                    v.EleccionId == eleccionId &&
+                    v.DireccionId == j.DireccionId &&
+                    v.NumeroMesa == j.NumeroMesa);
+
+                int digitales = totalRoles > 0 ? votosRaw / totalRoles : votosRaw;
 
                 respuesta.Add(Mapear(j, total, si, no, digitales));
             }
@@ -175,18 +210,14 @@ namespace SistemaVotoAPI.Controllers
             if (votante == null)
                 return NotFound("El votante no existe");
 
-            if (juntaId > int.MaxValue)
-                return BadRequest("El id de junta excede el rango permitido para el votante.");
-
             if (votante.JuntaId != (int)juntaId)
                 return BadRequest("El votante no pertenece a esta mesa.");
 
             junta.JefeDeJuntaId = cedulaVotante;
-
             votante.RolId = 3;
-            votante.JuntaId = (int)juntaId;
 
             await _context.SaveChangesAsync();
+
             return Ok("Jefe de junta asignado correctamente.");
         }
 
@@ -198,78 +229,12 @@ namespace SistemaVotoAPI.Controllers
                 return NotFound();
 
             if (junta.Estado != 3)
-                return BadRequest("Solo se pueden aprobar juntas en estado 'En espera' (3).");
+                return BadRequest("Solo se pueden aprobar juntas en estado pendiente.");
 
             junta.Estado = 4;
             await _context.SaveChangesAsync();
-            return Ok("Junta aprobada. Resultados cargados.");
-        }
 
-        [HttpPost("CrearPorDireccion")]
-        public async Task<IActionResult> CrearPorDireccion(int eleccionId, int direccionId, int cantidad)
-        {
-            var eleccionExiste = await _context.Elecciones.AnyAsync(e => e.Id == eleccionId);
-            if (!eleccionExiste)
-                return BadRequest("La elección no existe.");
-
-            int existentes = await _context.Juntas.CountAsync(j => j.EleccionId == eleccionId && j.DireccionId == direccionId);
-
-            var nuevasJuntas = new List<Junta>();
-
-            for (int i = 1; i <= cantidad; i++)
-            {
-                int num = existentes + i;
-
-                nuevasJuntas.Add(new Junta
-                {
-                    Id = long.Parse($"{eleccionId}{direccionId:D6}{num:D2}"),
-                    NumeroMesa = num,
-                    DireccionId = direccionId,
-                    EleccionId = eleccionId,
-                    Estado = 1
-                });
-            }
-
-            _context.Juntas.AddRange(nuevasJuntas);
-            await _context.SaveChangesAsync();
-
-            return Ok("Juntas creadas.");
-        }
-
-        [HttpGet("DeJefeActual/{cedula}")]
-        public async Task<IActionResult> GetJuntaDeJefeActual(string cedula)
-        {
-            cedula = (cedula ?? "").Trim();
-            if (string.IsNullOrWhiteSpace(cedula))
-                return BadRequest("Cédula inválida.");
-
-            var ahora = DateTime.Now;
-
-            var eleccionActiva = await _context.Elecciones
-                .Where(e => e.FechaInicio <= ahora && e.FechaFin >= ahora)
-                .OrderByDescending(e => e.FechaInicio)
-                .FirstOrDefaultAsync();
-
-            if (eleccionActiva == null)
-                return NotFound("No hay elección activa.");
-
-            var votante = await _context.Votantes.FindAsync(cedula);
-            if (votante == null)
-                return NotFound("Votante no existe.");
-
-            if (votante.RolId != 3)
-                return Conflict("No eres jefe de junta.");
-
-            if (!votante.JuntaId.HasValue)
-                return NotFound("No tienes junta asignada.");
-
-            var junta = await _context.Juntas
-                .FirstOrDefaultAsync(j => j.Id == votante.JuntaId.Value && j.EleccionId == eleccionActiva.Id);
-
-            if (junta == null)
-                return NotFound("Tu junta asignada pertenece a otra elección.");
-
-            return Ok(junta);
+            return Ok("Junta aprobada.");
         }
     }
 }

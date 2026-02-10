@@ -19,6 +19,31 @@ namespace SistemaVotoMVC.Controllers
         {
             _httpClientFactory = httpClientFactory;
         }
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> CrearJuntaPorDireccion(int eleccionId, int direccionId, int cantidad)
+        {
+            if (eleccionId <= 0 || direccionId <= 0 || cantidad <= 0)
+            {
+                TempData["Error"] = "Datos para la creación de juntas inválidos.";
+                
+                return RedirectToAction(nameof(Index));
+            }
+
+            var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
+            var url = $"{_endpointJuntas}/CrearPorDireccion?eleccionId={eleccionId}&direccionId={direccionId}&cantidad={cantidad}";
+            var response = await client.PostAsync(url, null);
+
+            if (response.IsSuccessStatusCode)
+            {
+                TempData["Mensaje"] = "Mesas/Juntas creadas correctamente.";
+            }
+            else
+            {
+                TempData["Error"] = await response.Content.ReadAsStringAsync();
+            }
+            return RedirectToAction(nameof(Index));
+        }
 
         [HttpGet]
         public async Task<IActionResult> Index()

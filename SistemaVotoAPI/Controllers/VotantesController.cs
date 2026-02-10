@@ -41,7 +41,7 @@ namespace SistemaVotoAPI.Controllers
 
         // GET: api/Votantes/PorJunta/3
         [HttpGet("PorJunta/{juntaId}")]
-        public async Task<ActionResult<IEnumerable<Votante>>> GetVotantesPorJunta(int juntaId)
+        public async Task<ActionResult<IEnumerable<Votante>>> GetVotantesPorJunta(long juntaId)
         {
             return await _context.Votantes
                 .Where(v => v.JuntaId == juntaId)
@@ -115,26 +115,17 @@ namespace SistemaVotoAPI.Controllers
             if (cedula != votante.Cedula)
                 return BadRequest("La cédula no coincide.");
 
-            // Buscamos el registro real que está en la base de datos para comparar
             var existente = await _context.Votantes.FindAsync(cedula);
             if (existente == null)
                 return NotFound("El votante no existe.");
 
-            // LOGICA DE PROTECCIÓN DE CONTRASEÑA
-            // Si el campo Password viene vacío o es exactamente igual al hash que ya tenemos,
-            // significa que no queremos cambiar la contraseña.
-            if (string.IsNullOrWhiteSpace(votante.Password) || votante.Password == existente.Password)
+            // PROTECCIÓN PASSWORD
+            if (!string.IsNullOrWhiteSpace(votante.Password) && votante.Password != existente.Password)
             {
-                // No tocamos la contraseña existente
-            }
-            else
-            {
-                // Si el texto es diferente y no está vacío, asumimos que es una clave nueva
-                // y procedemos a encriptarla.
                 existente.Password = PasswordHasher.Hash(votante.Password.Trim());
             }
 
-            // Actualizamos el resto de los campos normales
+            // CAMPOS NORMALES
             existente.NombreCompleto = votante.NombreCompleto;
             existente.Email = votante.Email;
             existente.FotoUrl = votante.FotoUrl;
@@ -145,6 +136,18 @@ namespace SistemaVotoAPI.Controllers
             try
             {
                 await _context.SaveChangesAsync();
+
+                // 🔥 SI ES JEFE → ACTUALIZAR TABLA JUNTAS
+                if (existente.RolId == 3 && existente.JuntaId.HasValue)
+                {
+                    var junta = await _context.Juntas.FindAsync(existente.JuntaId.Value);
+
+                    if (junta != null)
+                    {
+                        junta.JefeDeJuntaId = existente.Cedula;
+                        await _context.SaveChangesAsync();
+                    }
+                }
             }
             catch (DbUpdateConcurrencyException)
             {
@@ -154,6 +157,7 @@ namespace SistemaVotoAPI.Controllers
 
             return NoContent();
         }
+
         private bool VotanteExists(string cedula)
         {
             // Verifica en la base de datos si existe algún registro con esa cédula

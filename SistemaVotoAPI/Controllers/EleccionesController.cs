@@ -31,6 +31,7 @@ namespace SistemaVotoAPI.Controllers
         public async Task<ActionResult<IEnumerable<Eleccion>>> GetEleccion()
         {
             var now = DateTime.Now;
+            
             var elecciones = await _context.Elecciones.ToListAsync();
 
             bool huboCambios = false;

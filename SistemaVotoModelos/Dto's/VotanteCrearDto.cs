@@ -11,5 +11,5 @@ public class VotanteCrearDto
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty; 
     public int RolId { get; set; }
-    public int? JuntaId { get; set; }
+    public long? JuntaId { get; set; }
 }

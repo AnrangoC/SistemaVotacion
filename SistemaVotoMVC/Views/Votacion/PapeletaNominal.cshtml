@@ -30,105 +30,98 @@
                 <input type="hidden" name="EleccionId" value="@Model.EleccionId" />
                 <input type="hidden" name="TituloEleccion" value="@Model.TituloEleccion" />
 
-                <div class="mb-3">
-                    <label class="fw-bold">Cargo</label>
-                    <select id="selCargo" class="form-select">
-                        @foreach (var r in Model.Roles)
-                        {
-                            <option value="@r">@r</option>
-                        }
-                    </select>
-                    <div class="text-muted small mt-1">
-                        Selecciona el cargo y luego el candidato
-                    </div>
-                </div>
+                <!-- SECCIONES POR ROL -->
+                @foreach (var rol in Model.Roles)
+                {
+                    <div class="mb-4">
+                        <h5 class="fw-bold text-primary border-bottom pb-2">
+                            @rol
+                        </h5>
 
-                <input type="hidden" name="rolPostulante" id="rolPostulanteHidden" value="@Model.RolSeleccionado" />
+                        <div class="row g-3">
 
-                <div id="contenedorCandidatos" class="row g-3">
-                    @foreach (var c in Model.Candidatos)
-                    {
-                        var cargo = (c.RolPostulante ?? "").Trim();
-                        var nombre = c.Votante != null ? (c.Votante.NombreCompleto ?? "Sin nombre") : "Sin nombre";
-                        var lista = c.Lista != null ? (c.Lista.NombreLista ?? "") : "";
-                        var foto = c.Votante != null ? (c.Votante.FotoUrl ?? "") : "";
+                            <!-- VOTO EN BLANCO -->
+                            <div class="col-md-6">
+                                <label class="card border-1 h-100 p-3" style="cursor:pointer;">
+                                    <div class="d-flex gap-3">
+                                        <input type="radio"
+                                               name="voto_@rol"
+                                               value="0"
+                                               checked />
 
-                        <div class="col-md-6 candidato-item" data-cargo="@cargo">
-                            <label class="card border-1 h-100 p-3" style="cursor:pointer;">
-                                <div class="d-flex gap-3">
-                                    <input type="radio" name="candidatoId" value="@c.Id" />
-
-                                    <div class="flex-grow-1">
-                                        <div class="fw-bold">@nombre</div>
-                                        <div class="text-muted small">Lista: @lista</div>
-                                        <div class="text-muted small">Cargo: @cargo</div>
-                                        @if (c.Votante != null || c.Lista != null)
-                                        {
-                                            <div class="d-flex align-items-center gap-2 mb-2">
-                                                @if (!string.IsNullOrWhiteSpace(foto))
-                                                {
-                                                    <img src="@foto" alt="Candidato"
-                                                         style="width: 60px; height: 60px; object-fit: cover; border-radius: 50%; border: 2px solid #eee;" />
-                                                }
-
-                                                @if (c.Lista != null && !string.IsNullOrWhiteSpace(c.Lista.LogoUrl))
-                                                {
-                                                    <img src="@c.Lista.LogoUrl" alt="Logo Lista"
-                                                         style="width: 40px; height: 40px; object-fit: contain;" />
-                                                }
-                                            </div>
-                                        }
+                                        <div class="flex-grow-1">
+                                            <div class="fw-bold">Voto en blanco</div>
+                                            <div class="text-muted small">No seleccionar candidato</div>
+                                        </div>
                                     </div>
+                                </label>
+                            </div>
+
+                            <!-- CANDIDATOS DEL ROL -->
+                            @foreach (var c in Model.Candidatos.Where(x =>
+                                                    (x.RolPostulante ?? "").Trim() == rol))
+                            {
+                                var nombre = c.Votante?.NombreCompleto ?? "Sin nombre";
+                                var lista = c.Lista?.NombreLista ?? "";
+                                var foto = c.Votante?.FotoUrl ?? "";
+                                var logo = c.Lista?.LogoUrl ?? "";
+
+                                <div class="col-md-6">
+                                    <label class="card border-1 h-100 p-3" style="cursor:pointer;">
+                                        <div class="d-flex gap-3">
+
+                                            <input type="radio"
+                                                   name="voto_@rol"
+                                                   value="@c.Id" />
+
+                                            <div class="flex-grow-1">
+
+                                                <div class="fw-bold">@nombre</div>
+                                                <div class="text-muted small">Lista: @lista</div>
+
+                                                <div class="d-flex align-items-center gap-2 mt-2">
+
+                                                    @if (!string.IsNullOrWhiteSpace(foto))
+                                                    {
+                                                        <img src="@foto"
+                                                             style="width:60px;height:60px;object-fit:cover;border-radius:50%;border:2px solid #eee;" />
+                                                    }
+
+                                                    @if (!string.IsNullOrWhiteSpace(logo))
+                                                    {
+                                                        <img src="@logo"
+                                                             style="width:40px;height:40px;object-fit:contain;" />
+                                                    }
+
+                                                </div>
+
+                                            </div>
+                                        </div>
+                                    </label>
                                 </div>
-                            </label>
+                            }
+
                         </div>
-                    }
-                </div>
+                    </div>
+                }
 
                 <hr class="my-4" />
 
+                <!-- BOTON FINAL -->
                 <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-success flex-grow-1"
-                            onclick="return confirm('¿Confirmar voto?');">
+                    <button type="submit"
+                            class="btn btn-success flex-grow-1"
+                            onclick="return confirm('¿Confirmar voto completo?');">
                         Confirmar voto
-                    </button>
-
-                    <button type="submit" class="btn btn-outline-secondary"
-                            name="candidatoId" value="0"
-                            onclick="return confirm('¿Confirmar voto en blanco?');">
-                        Voto en blanco
                     </button>
                 </div>
 
                 <div class="text-muted small mt-3">
-                    Al confirmar, se registra el voto y el token queda inválido.
+                    Al confirmar, se registran todos los votos y el token queda inválido.
                 </div>
+
             </form>
 
         </div>
     </div>
 </div>
-
-@section Scripts {
-    <script>
-        function filtrarPorCargo() {
-            const cargo = (document.getElementById("selCargo").value || "");
-            document.getElementById("rolPostulanteHidden").value = cargo;
-
-            const items = document.querySelectorAll(".candidato-item");
-            items.forEach(x => {
-                const c = x.getAttribute("data-cargo") || "";
-                x.style.display = (cargo === "" || c === cargo) ? "" : "none";
-            });
-
-            // si el radio quedó oculto, lo desmarca
-            document.querySelectorAll("input[name='candidatoId']").forEach(r => {
-                const card = r.closest(".candidato-item");
-                if (card && card.style.display === "none") r.checked = false;
-            });
-        }
-
-        document.getElementById("selCargo").addEventListener("change", filtrarPorCargo);
-        filtrarPorCargo();
-    </script>
-}

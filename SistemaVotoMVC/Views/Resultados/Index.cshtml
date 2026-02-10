@@ -3,149 +3,212 @@
 }
 
 <div class="container mt-4">
+
     <div class="text-center mb-4">
-        <h1><i class="bi bi-bar-chart-fill text-primary"></i> Conteo de Votos Oficial</h1>
-        <p class="text-muted">Resultados en tiempo real basados en juntas validadas.</p>
+        <h1 class="fw-bold text-primary">Resultados por Cargo</h1>
+        <p class="text-muted">Resultados basados en juntas aprobadas</p>
     </div>
 
+    <!-- FILTROS -->
     <div class="card shadow-sm border-0 mb-4 bg-light">
         <div class="card-body">
             <div class="row g-2">
+
                 <div class="col-md-4">
                     <label class="small fw-bold">Provincia</label>
-                    <input type="text" id="inProvincia" class="form-control" placeholder="Ej: Guayas">
+                    <input type="text" id="inProvincia" class="form-control">
                 </div>
+
                 <div class="col-md-3">
                     <label class="small fw-bold">Cantón</label>
-                    <input type="text" id="inCanton" class="form-control" placeholder="Opcional">
+                    <input type="text" id="inCanton" class="form-control">
                 </div>
+
                 <div class="col-md-3">
                     <label class="small fw-bold">Parroquia</label>
-                    <input type="text" id="inParroquia" class="form-control" placeholder="Opcional">
+                    <input type="text" id="inParroquia" class="form-control">
                 </div>
+
                 <div class="col-md-2 d-flex align-items-end">
                     <button class="btn btn-primary w-100" onclick="actualizarResultados()">
-                        <i class="bi bi-search"></i> Consultar
+                        Consultar
                     </button>
                 </div>
+
             </div>
         </div>
     </div>
 
-    <div class="row">
-        <div class="col-lg-5 mb-4">
-            <div class="card h-100 border-0 shadow-sm p-3">
-                <h5 class="text-center fw-bold mb-3">Distribución de Sufragios</h5>
-                <div style="position: relative; height:300px;">
-                    <canvas id="canvasGrafico"></canvas>
-                </div>
-                <div id="total-votos-div" class="text-center mt-3 fw-bold text-primary"></div>
-            </div>
-        </div>
+    <!-- RESULTADOS -->
+    <div id="contenedorRoles"></div>
 
-        <div class="col-lg-7">
-            <div id="contenedor-barras" class="row">
-            </div>
-        </div>
-    </div>
 </div>
 
 @section Scripts {
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
-        let graficoVotos; 
-        // Al cargar la página, se ejecutan los resultados generales por defecto
+
+        let graficos = {};
+
         document.addEventListener("DOMContentLoaded", () => {
             actualizarResultados(true);
         });
 
         async function actualizarResultados(esGeneral = false) {
+
             const prov = document.getElementById('inProvincia').value;
             const cant = document.getElementById('inCanton').value;
             const parr = document.getElementById('inParroquia').value;
+
             if (!esGeneral && !prov) {
                 alert("Debes ingresar al menos la provincia.");
                 return;
             }
+
             const url = `/Resultados/ObtenerJson?provincia=${prov}&canton=${cant}&parroquia=${parr}`;
 
             try {
+
                 const resp = await fetch(url);
-                if (!resp.ok) throw new Error("Sin datos");
+                if (!resp.ok) throw new Error();
 
                 const data = await resp.json();
-                renderizarPantalla(data);
-            } catch (error) {
-                document.getElementById('contenedor-barras').innerHTML =
-                    '<div class="alert alert-warning text-center">No se encontraron datos validados para esta selección.</div>';
+
+                renderizarResultados(data);
+
+            } catch {
+
+                document.getElementById("contenedorRoles").innerHTML =
+                    `<div class="alert alert-warning text-center">
+                        No se encontraron datos.
+                    </div>`;
             }
         }
 
-        function renderizarPantalla(data) {
-            const barrasDiv = document.getElementById('contenedor-barras');
-            const totalDiv = document.getElementById('total-votos-div');
-            barrasDiv.innerHTML = "";
+        function renderizarResultados(data) {
 
-            const totalVotos = data.totalVotosGlobal || data.totalVotosEnSector || 0;
-            totalDiv.innerText = `Total Votos Contabilizados: ${totalVotos}`;
+            const contenedor = document.getElementById("contenedorRoles");
+            contenedor.innerHTML = "";
 
-            if (data.detalle && data.detalle.length > 0) {
-                const etiquetas = [];
-                const valores = [];
+            if (!data.roles || data.roles.length === 0) return;
 
-                data.detalle.forEach(item => {
-                    etiquetas.push(item.nombreLista);
-                    valores.push(item.votos);
+            data.roles.forEach((rol, index) => {
 
-                    // Llenar las barras de progreso a la derecha
-                    barrasDiv.innerHTML += `
-                        <div class="col-12 mb-3">
-                            <div class="card border-0 shadow-sm p-2">
-                                <div class="d-flex align-items-center mb-1">
-                                       <img src="${item.logo || '/img/voto-default.png'}"
-                                         style="width:35px; height:35px; object-fit: contain; background-color: #fff;"
-                                         class="me-2 rounded border shadow-sm">
-                                    <span class="small fw-bold">${item.nombreLista}</span>
-                                    <span class="ms-auto fw-bold text-primary">${item.porcentaje}%</span>
-                                </div>
-                                <div class="progress" style="height: 10px;">
-                                    <div class="progress-bar" style="width: ${item.porcentaje}%"></div>
-                                </div>
-                                <div class="text-end small text-muted">${item.votos} votos</div>
-                            </div>
-                        </div>`;
+                const canvasId = "chart_" + index;
+
+                let html = `
+                <div class="card shadow-sm border-0 mb-4 p-3">
+
+                    <h4 class="fw-bold text-center text-primary mb-3">
+                        ${rol.rol}
+                    </h4>
+
+                    <div style="height:300px">
+                        <canvas id="${canvasId}"></canvas>
+                    </div>
+
+                    <div class="mt-3">
+                `;
+
+                rol.detalle.forEach(item => {
+
+                    const esBlanco = item.nombreLista &&
+                                     item.nombreLista.trim().toLowerCase() === "blanco";
+
+                    html += `
+                    <div class="mb-2">
+
+                        <div class="d-flex align-items-center mb-1">
+
+                            ${
+                                !esBlanco
+                                ? `<img src="${
+                                        (item.logo && item.logo.trim() !== '')
+                                            ? item.logo
+                                            : '/img/voto-default.png'
+                                    }"
+                                    style="width:35px;height:35px;object-fit:contain;background:#fff"
+                                    class="me-2 border rounded">`
+                                : ''
+                            }
+
+                            <span class="fw-bold small">
+                                ${item.nombreLista}
+                            </span>
+
+                            <span class="ms-auto fw-bold text-primary">
+                                ${item.porcentaje}%
+                            </span>
+
+                        </div>
+
+                        <div class="progress" style="height:10px">
+                            <div class="progress-bar"
+                                 style="width:${item.porcentaje}%"></div>
+                        </div>
+
+                        <div class="text-end small text-muted">
+                            ${item.votos} votos
+                        </div>
+
+                    </div>
+                    `;
                 });
 
-                actualizarDibujoGrafico(etiquetas, valores);
-            }
+                html += `
+                    </div>
+                </div>
+                `;
+
+                contenedor.insertAdjacentHTML("beforeend", html);
+            });
+
+            setTimeout(() => {
+                data.roles.forEach((rol, index) => {
+                    crearGrafico("chart_" + index, rol);
+                });
+            }, 50);
         }
 
-        function actualizarDibujoGrafico(etiquetas, valores) {
-            const ctx = document.getElementById('canvasGrafico').getContext('2d');
+        function crearGrafico(canvasId, rol) {
 
-            // Si el gráfico ya existe, lo destruimos para crear uno nuevo con los nuevos datos
-            if (graficoVotos) {
-                graficoVotos.destroy();
-            }
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
 
-            graficoVotos = new Chart(ctx, {
-                type: 'doughnut',
+            const ctx = canvas.getContext("2d");
+
+            if (graficos[canvasId]) graficos[canvasId].destroy();
+
+            graficos[canvasId] = new Chart(ctx, {
+
+                type: "doughnut",
+
                 data: {
-                    labels: etiquetas,
+                    labels: rol.detalle.map(x => x.nombreLista),
                     datasets: [{
-                        data: valores,
-                        backgroundColor: ['#0d6efd', '#dc3545', '#ffc107', '#198754', '#0dcaf0', '#6610f2'],
-                        hoverOffset: 20
+                        data: rol.detalle.map(x => x.votos),
+                        backgroundColor: [
+                            "#0d6efd",
+                            "#dc3545",
+                            "#ffc107",
+                            "#198754",
+                            "#0dcaf0",
+                            "#6610f2"
+                        ]
                     }]
                 },
+
                 options: {
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'bottom', labels: { boxWidth: 12 } }
+                        legend: { position: "bottom" }
                     }
                 }
+
             });
         }
+
     </script>
 }

@@ -1,7 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
-using SistemaVotoModelos;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,60 +18,101 @@ namespace SistemaVotoAPI.Controllers
         {
             _context = context;
         }
+
         // GET: api/Resultados/Generales
         [HttpGet("Generales")]
         public async Task<IActionResult> ResultadosGenerales(int? eleccionId = null)
         {
             int eid;
+
             if (eleccionId.HasValue && eleccionId.Value > 0)
                 eid = eleccionId.Value;
             else
             {
-                var ultima = await _context.Elecciones.OrderByDescending(e => e.FechaInicio).FirstOrDefaultAsync();
-                if (ultima == null) return NotFound("No existen elecciones.");
+                var ultima = await _context.Elecciones
+                    .OrderByDescending(e => e.FechaInicio)
+                    .FirstOrDefaultAsync();
+
+                if (ultima == null)
+                    return NotFound("No existen elecciones.");
+
                 eid = ultima.Id;
             }
 
-            // Query global validando con Juntas Aprobadas (Estado 4)
-            var query = from v in _context.VotosAnonimos
+            // Query validando juntas aprobadas
+            var votos = from v in _context.VotosAnonimos
                         join j in _context.Juntas
-                            on new { v.EleccionId, v.DireccionId, v.NumeroMesa }
-                            equals new { j.EleccionId, j.DireccionId, j.NumeroMesa }
+                        on new { v.EleccionId, v.DireccionId, v.NumeroMesa }
+                        equals new { j.EleccionId, j.DireccionId, j.NumeroMesa }
                         where v.EleccionId == eid && j.Estado == 4
                         select v;
 
-            var conteo = await query
-                .GroupBy(v => v.ListaId)
-                .Select(g => new { ListaId = g.Key, TotalVotos = g.Count() })
+            // Agrupar por Rol + Lista
+            var conteo = await votos
+                .GroupBy(v => new { v.RolPostulante, v.ListaId })
+                .Select(g => new
+                {
+                    Rol = g.Key.RolPostulante,
+                    ListaId = g.Key.ListaId,
+                    TotalVotos = g.Count()
+                })
                 .ToListAsync();
 
-            int granTotal = conteo.Sum(c => c.TotalVotos);
-            var resultadosFinales = new List<object>();
-
-            foreach (var item in conteo)
-            {
-                var lista = await _context.Listas.FindAsync(item.ListaId);
-                double porcentaje = granTotal > 0 ? (double)item.TotalVotos / granTotal * 100 : 0;
-
-                resultadosFinales.Add(new
+            // Agrupar por Rol para armar secciones
+            var roles = conteo
+                .GroupBy(x => x.Rol)
+                .Select(gr => new
                 {
-                    NombreLista = lista?.NombreLista ?? "Otros/Votos en Blanco",
-                    Logo = lista?.LogoUrl,
-                    Votos = item.TotalVotos,
-                    Porcentaje = Math.Round(porcentaje, 2)
+                    Rol = string.IsNullOrWhiteSpace(gr.Key) ? "SIN CARGO" : gr.Key,
+                    TotalRol = gr.Sum(x => x.TotalVotos),
+                    Detalle = gr.Select(x => new
+                    {
+                        ListaId = x.ListaId,
+                        Votos = x.TotalVotos
+                    }).ToList()
+                })
+                .ToList();
+
+            // Armar respuesta final con nombres de listas
+            var resultadoFinal = new List<object>();
+
+            foreach (var rol in roles)
+            {
+                var detalleFinal = new List<object>();
+
+                foreach (var item in rol.Detalle)
+                {
+                    var lista = await _context.Listas.FindAsync(item.ListaId);
+
+                    double porcentaje = rol.TotalRol > 0
+                        ? (double)item.Votos / rol.TotalRol * 100
+                        : 0;
+
+                    detalleFinal.Add(new
+                    {
+                        NombreLista = lista?.NombreLista ?? "Blanco",
+                        Logo = lista?.LogoUrl,
+                        Votos = item.Votos,
+                        Porcentaje = Math.Round(porcentaje, 2)
+                    });
+                }
+
+                resultadoFinal.Add(new
+                {
+                    Rol = rol.Rol,
+                    TotalRol = rol.TotalRol,
+                    Detalle = detalleFinal.OrderByDescending(x => ((dynamic)x).Votos)
                 });
             }
 
             return Ok(new
             {
                 EleccionId = eid,
-                EsGeneral = true,
-                TotalVotosGlobal = granTotal,
-                Detalle = resultadosFinales.OrderByDescending(r => ((dynamic)r).Votos)
+                Roles = resultadoFinal
             });
         }
+
         // GET: api/Resultados/PorDireccion
-        // Este método permite filtrar resultados por Provincia, Cantón y Parroquia
         [HttpGet("PorDireccion")]
         public async Task<IActionResult> ResultadosPorDireccion(
             string provincia,
@@ -81,61 +121,88 @@ namespace SistemaVotoAPI.Controllers
             int? eleccionId = null)
         {
             if (string.IsNullOrWhiteSpace(provincia))
-                return BadRequest("La provincia es obligatoria para realizar la búsqueda.");
+                return BadRequest("Provincia obligatoria.");
 
-            // Determinar la elección a consultar
             int eid;
+
             if (eleccionId.HasValue && eleccionId.Value > 0)
-            {
                 eid = eleccionId.Value;
-            }
             else
             {
                 var ultima = await _context.Elecciones
                     .OrderByDescending(e => e.FechaInicio)
                     .FirstOrDefaultAsync();
 
-                if (ultima == null) return NotFound("No existen elecciones registradas.");
+                if (ultima == null)
+                    return NotFound("No existen elecciones.");
+
                 eid = ultima.Id;
             }
 
-            //  Query con Joins para cruzar Votos, Direcciones y validar con Juntas Aprobadas (Estado 4)
-            var query = from v in _context.VotosAnonimos
+            var votos = from v in _context.VotosAnonimos
                         join d in _context.Direcciones on v.DireccionId equals d.Id
                         join j in _context.Juntas
-                            on new { v.EleccionId, v.DireccionId, v.NumeroMesa }
-                            equals new { j.EleccionId, j.DireccionId, j.NumeroMesa }
-                        where v.EleccionId == eid && j.Estado == 4 && d.Provincia == provincia
+                        on new { v.EleccionId, v.DireccionId, v.NumeroMesa }
+                        equals new { j.EleccionId, j.DireccionId, j.NumeroMesa }
+                        where v.EleccionId == eid
+                        && j.Estado == 4
+                        && d.Provincia == provincia
                         select new { v, d };
 
-            //  Aplicar filtros geográficos opcionales
             if (!string.IsNullOrWhiteSpace(canton))
-                query = query.Where(x => x.d.Canton == canton);
+                votos = votos.Where(x => x.d.Canton == canton);
 
             if (!string.IsNullOrWhiteSpace(parroquia))
-                query = query.Where(x => x.d.Parroquia == parroquia);
+                votos = votos.Where(x => x.d.Parroquia == parroquia);
 
-            //  Agrupar por ListaId y contar los votos
-            var conteo = await query
-                .GroupBy(x => x.v.ListaId)
-                .Select(g => new { ListaId = g.Key, TotalVotos = g.Count() })
+            var conteo = await votos
+                .GroupBy(x => new { x.v.RolPostulante, x.v.ListaId })
+                .Select(g => new
+                {
+                    Rol = g.Key.RolPostulante,
+                    ListaId = g.Key.ListaId,
+                    TotalVotos = g.Count()
+                })
                 .ToListAsync();
 
-            //  Preparar respuesta con nombres de listas, logos y porcentajes
-            int granTotal = conteo.Sum(c => c.TotalVotos);
-            var resultadosFinales = new List<object>();
-
-            foreach (var item in conteo)
-            {
-                var lista = await _context.Listas.FindAsync(item.ListaId);
-                double porcentaje = granTotal > 0 ? (double)item.TotalVotos / granTotal * 100 : 0;
-
-                resultadosFinales.Add(new
+            var roles = conteo
+                .GroupBy(x => x.Rol)
+                .Select(gr => new
                 {
-                    NombreLista = lista?.NombreLista ?? "Otros/Votos en Blanco",
-                    Logo = lista?.LogoUrl,
-                    Votos = item.TotalVotos,
-                    Porcentaje = Math.Round(porcentaje, 2)
+                    Rol = string.IsNullOrWhiteSpace(gr.Key) ? "SIN CARGO" : gr.Key,
+                    TotalRol = gr.Sum(x => x.TotalVotos),
+                    Detalle = gr.ToList()
+                })
+                .ToList();
+
+            var resultadoFinal = new List<object>();
+
+            foreach (var rol in roles)
+            {
+                var detalleFinal = new List<object>();
+
+                foreach (var item in rol.Detalle)
+                {
+                    var lista = await _context.Listas.FindAsync(item.ListaId);
+
+                    double porcentaje = rol.TotalRol > 0
+                        ? (double)item.TotalVotos / rol.TotalRol * 100
+                        : 0;
+
+                    detalleFinal.Add(new
+                    {
+                        NombreLista = lista?.NombreLista ?? "Blanco",
+                        Logo = lista?.LogoUrl,
+                        Votos = item.TotalVotos,
+                        Porcentaje = Math.Round(porcentaje, 2)
+                    });
+                }
+
+                resultadoFinal.Add(new
+                {
+                    Rol = rol.Rol,
+                    TotalRol = rol.TotalRol,
+                    Detalle = detalleFinal.OrderByDescending(x => ((dynamic)x).Votos)
                 });
             }
 
@@ -143,8 +210,7 @@ namespace SistemaVotoAPI.Controllers
             {
                 EleccionId = eid,
                 Filtros = new { Provincia = provincia, Canton = canton, Parroquia = parroquia },
-                TotalVotosEnSector = granTotal,
-                Detalle = resultadosFinales.OrderByDescending(r => ((dynamic)r).Votos)
+                Roles = resultadoFinal
             });
         }
     }

@@ -140,21 +140,22 @@ namespace SistemaVotoMVC.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> EmitirNominal(PapeletaNominalVm vm, int candidatoId, string rolPostulante)
+        public async Task<IActionResult> EmitirNominal(PapeletaNominalVm vm)
         {
             vm.Cedula = (vm.Cedula ?? "").Trim();
             vm.Token = (vm.Token ?? "").Trim();
-            rolPostulante = (rolPostulante ?? "").Trim();
 
-            if (string.IsNullOrWhiteSpace(vm.Cedula) || string.IsNullOrWhiteSpace(vm.Token) || vm.EleccionId <= 0)
+            if (string.IsNullOrWhiteSpace(vm.Cedula) ||
+                string.IsNullOrWhiteSpace(vm.Token) ||
+                vm.EleccionId <= 0)
             {
-                TempData["Error"] = "Sesión inválida. Vuelve a ingresar con tu token.";
+                TempData["Error"] = "Sesión inválida. Vuelve a ingresar.";
                 return RedirectToAction(nameof(Index));
             }
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
-            // 1) Recargar candidatos (porque en POST vm.Candidatos viene vacío)
+            // 🔥 Volver a cargar candidatos (POST pierde listas)
             var elec = await client.GetFromJsonAsync<Eleccion>($"api/Elecciones/{vm.EleccionId}");
             if (elec == null)
             {
@@ -162,8 +163,8 @@ namespace SistemaVotoMVC.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var candidatos = await client.GetFromJsonAsync<List<Candidato>>($"api/Candidatos/PorEleccion/{vm.EleccionId}")
-                            ?? new List<Candidato>();
+            var candidatos = await client.GetFromJsonAsync<List<Candidato>>(
+                $"api/Candidatos/PorEleccion/{vm.EleccionId}") ?? new List<Candidato>();
 
             var roles = candidatos
                 .Select(c => (c.RolPostulante ?? "").Trim())
@@ -172,63 +173,61 @@ namespace SistemaVotoMVC.Controllers
                 .OrderBy(x => x)
                 .ToList();
 
-            var papeleta = new PapeletaNominalVm
+            // AQUÍ ARMAMOS LISTA DE VOTOS
+            var votos = new List<object>();
+
+            foreach (var rol in roles)
             {
-                Cedula = vm.Cedula,
-                Token = vm.Token,
-                EleccionId = vm.EleccionId,
-                TituloEleccion = elec.Titulo ?? "Elección",
-                Candidatos = candidatos,
-                Roles = roles,
-                RolSeleccionado = string.IsNullOrWhiteSpace(rolPostulante) ? (roles.FirstOrDefault() ?? "") : rolPostulante
-            };
+                string campo = $"voto_{rol}";
+                var valor = Request.Form[campo].FirstOrDefault();
 
-            // 2) Voto en blanco
-            string cedulaCandidato = "";
-            string rolFinal = "";
-            int listaId = 0;
+                int candidatoId = 0;
+                int.TryParse(valor, out candidatoId);
 
-            if (candidatoId != 0)
-            {
-                var elegido = papeleta.Candidatos.FirstOrDefault(x => x.Id == candidatoId);
-                if (elegido == null)
+                if (candidatoId == 0)
                 {
-                    TempData["Error"] = "Selección inválida.";
-                    return View("PapeletaNominal", papeleta);
+                    // VOTO EN BLANCO
+                    votos.Add(new
+                    {
+                        RolPostulante = rol,
+                        ListaId = 0,
+                        CedulaCandidato = ""
+                    });
                 }
-
-                if (!string.Equals((elegido.RolPostulante ?? "").Trim(), rolPostulante, StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    TempData["Error"] = "Selección inválida para ese cargo.";
-                    return View("PapeletaNominal", papeleta);
-                }
+                    var elegido = candidatos.FirstOrDefault(x => x.Id == candidatoId);
 
-                cedulaCandidato = (elegido.Cedula ?? "").Trim();
-                rolFinal = (elegido.RolPostulante ?? "").Trim();
-                listaId = elegido.ListaId;
+                    if (elegido != null)
+                    {
+                        votos.Add(new
+                        {
+                            RolPostulante = rol,
+                            ListaId = elegido.ListaId,
+                            CedulaCandidato = elegido.Cedula
+                        });
+                    }
+                }
             }
 
-            // 3) Registrar voto en API
-            var resp = await client.PostAsJsonAsync("api/VotosAnonimos/Emitir", new
+            // ENVIAMOS TODO JUNTO
+            var resp = await client.PostAsJsonAsync("api/VotosAnonimos/EmitirMultiple", new
             {
-                Cedula = papeleta.Cedula,
-                //Token = papeleta.Token,
-                EleccionId = papeleta.EleccionId,
-                ListaId = listaId,
-                CedulaCandidato = cedulaCandidato,
-                RolPostulante = rolFinal
+                Cedula = vm.Cedula,
+                EleccionId = vm.EleccionId,
+                Votos = votos
             });
 
             if (!resp.IsSuccessStatusCode)
             {
-                var msg = await resp.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(msg) ? "No se pudo registrar el voto." : msg;
-                return View("PapeletaNominal", papeleta);
+                TempData["Error"] = await resp.Content.ReadAsStringAsync();
+                return RedirectToAction(nameof(Index));
             }
 
-            TempData["Mensaje"] = "Voto registrado correctamente.";
+            TempData["Mensaje"] = "Votos registrados correctamente.";
             return RedirectToAction(nameof(Confirmacion));
         }
+
 
 
         [HttpGet]

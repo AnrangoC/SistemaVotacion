@@ -5,20 +5,42 @@
 <div class="container mt-5" style="max-width:700px;">
     <div class="card shadow-sm border-0">
         <div class="card-body text-center py-5">
+            <div class="mb-4">
+                <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+            </div>
             <h3 class="fw-bold mb-2">Voto registrado</h3>
-
             @if (TempData["Mensaje"] != null)
             {
                 <div class="text-success fw-bold">@TempData["Mensaje"]</div>
             }
             else
             {
-                <div class="text-success fw-bold">Gracias por participar.</div>
+                <div class="text-success fw-bold">Ha ejercido su derecho al voto correctamente.</div>
             }
-
-            <div class="text-muted mt-3">
-                Puedes cerrar esta ventana.
+            <div class="text-muted mt-3 mb-4">
+                Serás redirigido automáticamente en <span id="countdown">5</span> segundos...
             </div>
+
+            <a href="@Url.Action("Index", "Votacion")" class="btn btn-outline-primary btn-sm">
+                Volver ahora
+            </a>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        let seconds = 5;
+        const display = document.querySelector('#countdown');
+
+        const timer = setInterval(function () {
+            seconds--;
+            if (display) display.textContent = seconds;
+
+            if (seconds <= 0) {
+                clearInterval(timer);
+                window.location.href = '@Url.Action("Index", "Votacion")';
+            }
+        }, 1000);
+    </script>
+}

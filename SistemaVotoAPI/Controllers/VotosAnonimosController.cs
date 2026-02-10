@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
 using SistemaVotoModelos;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Controllers
@@ -18,7 +19,7 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // El token se usa solo para ingresar al sistema en el cliente MVC
+        // Registra un solo voto (se mantiene por compatibilidad)
         [HttpPost("Emitir")]
         public async Task<IActionResult> Emitir([FromBody] EmitirVotoRequestDto request)
         {
@@ -33,7 +34,6 @@ namespace SistemaVotoAPI.Controllers
             if (request.EleccionId <= 0)
                 return BadRequest("EleccionId inválido.");
 
-            // 1. Validar que el votante existe, está activo y no ha votado aún
             var votante = await _context.Votantes.FindAsync(cedula);
             if (votante == null || votante.Estado != true)
                 return Unauthorized("Votante no existe o está inactivo.");
@@ -41,39 +41,33 @@ namespace SistemaVotoAPI.Controllers
             if (votante.HaVotado)
                 return Conflict("El votante ya registró su voto.");
 
-            // 2. Validar que la elección exista y su estado sea estrictamente "ACTIVA"
             var eleccion = await _context.Elecciones.FindAsync(request.EleccionId);
             if (eleccion == null)
                 return BadRequest("La elección no existe.");
 
             if (eleccion.Estado != "ACTIVA")
-                return BadRequest("La elección no está habilitada para recibir votos en este momento.");
+                return BadRequest("La elección no está habilitada.");
 
-            // 3. Validar la existencia y el estado de la junta asignada
             if (!votante.JuntaId.HasValue)
-                return BadRequest("El votante no tiene una junta asignada.");
+                return BadRequest("El votante no tiene junta asignada.");
 
             var junta = await _context.Juntas
                 .FirstOrDefaultAsync(j => j.Id == votante.JuntaId.Value);
 
             if (junta == null)
-                return BadRequest("No se encontró la junta del votante.");
+                return BadRequest("No se encontró la junta.");
 
-            // 4. Crear el registro de voto anónimo
             var voto = new VotoAnonimo
             {
-                // Uso de hora local de Ecuador para consistencia con EleccionesController
                 FechaVoto = DateTime.Now,
                 EleccionId = request.EleccionId,
                 DireccionId = junta.DireccionId,
                 NumeroMesa = junta.NumeroMesa,
-
-                ListaId = request.ListaId, // 0 indica voto en blanco
+                ListaId = request.ListaId,
                 CedulaCandidato = (request.CedulaCandidato ?? "").Trim(),
                 RolPostulante = (request.RolPostulante ?? "").Trim()
             };
 
-            // 5. Marcar al votante para impedir que vote nuevamente y guardar cambios
             votante.HaVotado = true;
 
             _context.VotosAnonimos.Add(voto);
@@ -81,15 +75,91 @@ namespace SistemaVotoAPI.Controllers
 
             return Ok("Voto registrado correctamente.");
         }
+
+        // Registra varios votos en una sola operación
+        [HttpPost("EmitirMultiple")]
+        public async Task<IActionResult> EmitirMultiple([FromBody] EmitirMultipleRequestDto request)
+        {
+            if (request == null || request.Votos == null || request.Votos.Count == 0)
+                return BadRequest("No se recibieron votos.");
+
+            var cedula = (request.Cedula ?? "").Trim();
+
+            if (string.IsNullOrWhiteSpace(cedula))
+                return BadRequest("Debe enviar cédula.");
+
+            if (request.EleccionId <= 0)
+                return BadRequest("EleccionId inválido.");
+
+            var votante = await _context.Votantes.FindAsync(cedula);
+            if (votante == null || votante.Estado != true)
+                return Unauthorized("Votante no existe o está inactivo.");
+
+            if (votante.HaVotado)
+                return Conflict("El votante ya registró su voto.");
+
+            var eleccion = await _context.Elecciones.FindAsync(request.EleccionId);
+            if (eleccion == null)
+                return BadRequest("La elección no existe.");
+
+            if (eleccion.Estado != "ACTIVA")
+                return BadRequest("La elección no está habilitada.");
+
+            if (!votante.JuntaId.HasValue)
+                return BadRequest("El votante no tiene junta asignada.");
+
+            var junta = await _context.Juntas
+                .FirstOrDefaultAsync(j => j.Id == votante.JuntaId.Value);
+
+            if (junta == null)
+                return BadRequest("No se encontró la junta.");
+
+            foreach (var v in request.Votos)
+            {
+                var voto = new VotoAnonimo
+                {
+                    FechaVoto = DateTime.Now,
+                    EleccionId = request.EleccionId,
+                    DireccionId = junta.DireccionId,
+                    NumeroMesa = junta.NumeroMesa,
+                    ListaId = v.ListaId,
+                    CedulaCandidato = (v.CedulaCandidato ?? "").Trim(),
+                    RolPostulante = (v.RolPostulante ?? "").Trim()
+                };
+
+                _context.VotosAnonimos.Add(voto);
+            }
+
+            votante.HaVotado = true;
+
+            await _context.SaveChangesAsync();
+
+            return Ok("Votos registrados correctamente.");
+        }
     }
 
+    // DTO para voto individual
     public class EmitirVotoRequestDto
     {
-        public string Cedula { get; set; } = string.Empty;
+        public string Cedula { get; set; } = "";
         public int EleccionId { get; set; }
+        public int ListaId { get; set; }
+        public string? CedulaCandidato { get; set; }
+        public string? RolPostulante { get; set; }
+    }
 
-        public int ListaId { get; set; }               // 0 si voto en blanco
-        public string? CedulaCandidato { get; set; }   // opcional
-        public string? RolPostulante { get; set; }     // opcional
+    // DTO para múltiples votos
+    public class EmitirMultipleRequestDto
+    {
+        public string Cedula { get; set; } = "";
+        public int EleccionId { get; set; }
+        public List<VotoIndividualDto> Votos { get; set; } = new();
+    }
+
+    public class VotoIndividualDto
+    {
+        public int ListaId { get; set; }
+        public string CedulaCandidato { get; set; } = "";
+        public string RolPostulante { get; set; } = "";
     }
 }
