@@ -1,5 +1,25 @@
 ﻿@{
     ViewData["Title"] = "Resultados de Elecciones";
+
+    var elecciones = ViewBag.Elecciones as List<SistemaVotoModelos.Eleccion>
+                     ?? new List<SistemaVotoModelos.Eleccion>();
+
+    int eleccionId = 0;
+
+    if (ViewBag.EleccionSeleccionada != null)
+    {
+        int.TryParse(ViewBag.EleccionSeleccionada.ToString(), out eleccionId);
+    }
+
+    if (eleccionId == 0 && elecciones.Any())
+    {
+        eleccionId = elecciones
+            .OrderByDescending(e => e.FechaInicio)
+            .Select(e => e.Id)
+            .FirstOrDefault();
+    }
+
+    var eleccion = elecciones.FirstOrDefault(e => e.Id == eleccionId);
 }
 
 <div class="container mt-4">
@@ -9,7 +29,40 @@
         <p class="text-muted">Resultados basados en juntas aprobadas</p>
     </div>
 
-    <!-- FILTROS -->
+    <div class="card shadow-sm border-0 mb-4 bg-light">
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-10">
+                    <label class="small fw-bold">Elección</label>
+                    <select id="inEleccion" class="form-select">
+                        @foreach (var e in elecciones.OrderByDescending(x => x.FechaInicio))
+                        {
+                            <option value="@e.Id" selected="@(e.Id == eleccionId)">
+                                #@e.Id - @e.Titulo (@e.Estado)
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-dark w-100" type="button" onclick="actualizarResultados(true)">
+                        Cargar
+                    </button>
+                </div>
+            </div>
+
+            @if (eleccion != null)
+            {
+                <div class="mt-2 small text-muted">
+                    <span class="fw-semibold">Elección actual:</span>
+                    <span>@eleccion.Titulo</span>
+                    <span class="ms-2 badge @(eleccion.Estado == "ACTIVA" ? "bg-success" : eleccion.Estado == "FINALIZADA" ? "bg-secondary" : "bg-warning text-dark")">
+                        @eleccion.Estado
+                    </span>
+                </div>
+            }
+        </div>
+    </div>
+
     <div class="card shadow-sm border-0 mb-4 bg-light">
         <div class="card-body">
             <div class="row g-2">
@@ -30,7 +83,7 @@
                 </div>
 
                 <div class="col-md-2 d-flex align-items-end">
-                    <button class="btn btn-primary w-100" onclick="actualizarResultados()">
+                    <button class="btn btn-primary w-100" type="button" onclick="actualizarResultados()">
                         Consultar
                     </button>
                 </div>
@@ -39,7 +92,6 @@
         </div>
     </div>
 
-    <!-- RESULTADOS -->
     <div id="contenedorRoles"></div>
 
 </div>
@@ -62,12 +114,20 @@
             const cant = document.getElementById('inCanton').value;
             const parr = document.getElementById('inParroquia').value;
 
+            const eleccionId = document.getElementById('inEleccion').value;
+
+            if (!eleccionId) {
+                document.getElementById("contenedorRoles").innerHTML =
+                    `<div class="alert alert-warning text-center">No hay elecciones para consultar.</div>`;
+                return;
+            }
+
             if (!esGeneral && !prov) {
                 alert("Debes ingresar al menos la provincia.");
                 return;
             }
 
-            const url = `/Resultados/ObtenerJson?provincia=${prov}&canton=${cant}&parroquia=${parr}`;
+            const url = `/Resultados/ObtenerJson?eleccionId=${encodeURIComponent(eleccionId)}&provincia=${encodeURIComponent(prov)}&canton=${encodeURIComponent(cant)}&parroquia=${encodeURIComponent(parr)}`;
 
             try {
 
