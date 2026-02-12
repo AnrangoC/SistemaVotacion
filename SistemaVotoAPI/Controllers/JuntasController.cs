@@ -236,5 +236,36 @@ namespace SistemaVotoAPI.Controllers
 
             return Ok("Junta aprobada.");
         }
+        [HttpPost("CrearPorDireccion")]
+        public async Task<IActionResult> CrearPorDireccion(int eleccionId, int direccionId, int cantidad)
+        {
+            var eleccionExiste = await _context.Elecciones.AnyAsync(e => e.Id == eleccionId);
+            if (!eleccionExiste)
+                return BadRequest("La elección no existe.");
+
+            int existentes = await _context.Juntas.CountAsync(j => j.EleccionId == eleccionId && j.DireccionId == direccionId);
+
+            var nuevasJuntas = new List<Junta>();
+
+            for (int i = 1; i <= cantidad; i++)
+            {
+                int num = existentes + i;
+
+                nuevasJuntas.Add(new Junta
+                {
+                    Id = long.Parse($"{eleccionId}{direccionId:D6}{num:D2}"),
+                    NumeroMesa = num,
+                    DireccionId = direccionId,
+                    EleccionId = eleccionId,
+                    Estado = 1
+                });
+            }
+
+            _context.Juntas.AddRange(nuevasJuntas);
+            await _context.SaveChangesAsync();
+
+            return Ok("Juntas creadas.");
+        }
     }
-}
+
+    }
