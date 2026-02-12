@@ -31,22 +31,41 @@ namespace SistemaVotoAPI.Controllers
         public async Task<ActionResult<IEnumerable<Eleccion>>> GetEleccion()
         {
             var now = DateTime.Now;
-            
+
             var elecciones = await _context.Elecciones.ToListAsync();
 
             bool huboCambios = false;
+            bool algunaPasoAActiva = false;
+
             foreach (var e in elecciones)
             {
+                var estadoAnterior = e.Estado;
                 var nuevoEstado = CalcularEstado(e, now);
-                if (e.Estado != nuevoEstado)
+
+                if (estadoAnterior != nuevoEstado)
                 {
                     e.Estado = nuevoEstado;
                     huboCambios = true;
+
+                    // Si alguna elección acaba de pasar a ACTIVA, reseteamos a todos
+                    if (estadoAnterior != "ACTIVA" && nuevoEstado == "ACTIVA")
+                        algunaPasoAActiva = true;
                 }
             }
 
             if (huboCambios)
+            {
+                // Guardamos el cambio de estado primero
                 await _context.SaveChangesAsync();
+
+                // Si al menos una pasó a ACTIVA, reseteo masivo
+                if (algunaPasoAActiva)
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "UPDATE \"Votantes\" SET \"HaVotado\" = FALSE;"
+                    );
+                }
+            }
 
             return elecciones;
         }
@@ -58,12 +77,21 @@ namespace SistemaVotoAPI.Controllers
             if (eleccion == null) return NotFound();
 
             var now = DateTime.Now;
+            var estadoAnterior = eleccion.Estado;
             var nuevoEstado = CalcularEstado(eleccion, now);
 
-            if (eleccion.Estado != nuevoEstado)
+            if (estadoAnterior != nuevoEstado)
             {
                 eleccion.Estado = nuevoEstado;
                 await _context.SaveChangesAsync();
+
+                // Si esta elección justo pasó a ACTIVA, reseteo masivo
+                if (estadoAnterior != "ACTIVA" && nuevoEstado == "ACTIVA")
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "UPDATE \"Votantes\" SET \"HaVotado\" = FALSE;"
+                    );
+                }
             }
 
             return eleccion;
@@ -98,7 +126,7 @@ namespace SistemaVotoAPI.Controllers
             var existente = await _context.Elecciones.FindAsync(id);
             if (existente == null) return NotFound();
 
-            // Si la fecha actual es igual o mayor a la fecha de inicio guardada, se bloquea la edición.
+            // Bloqueo de edición si ya empezó (según tu lógica actual)
             if (DateTime.Now >= existente.FechaInicio)
             {
                 return BadRequest("No se puede editar una elección que ya ha comenzado o que ya finalizó.");
@@ -111,12 +139,33 @@ namespace SistemaVotoAPI.Controllers
             if (eleccion.FechaFin <= eleccion.FechaInicio)
                 return BadRequest("La fecha/hora fin debe ser mayor que la fecha/hora inicio.");
 
+            var estadoAnterior = existente.Estado;
+
+            // OJO: aquí el nuevo estado debe calcularse con las fechas NUEVAS (eleccion)
+            var nuevoEstado = CalcularEstado(eleccion, DateTime.Now);
+
+            // RESET MASIVO si (por alguna razón) desde aquí llega a pasar a ACTIVA
+            if (estadoAnterior != "ACTIVA" && nuevoEstado == "ACTIVA")
+            {
+                try
+                {
+                    await _context.Database.ExecuteSqlRawAsync(
+                        "UPDATE \"Votantes\" SET \"HaVotado\" = FALSE;"
+                    );
+                }
+                catch (Exception ex)
+                {
+                    return StatusCode(500, "Error al resetear votantes: " + ex.Message);
+                }
+            }
+
             existente.Titulo = titulo;
             existente.FechaInicio = eleccion.FechaInicio;
             existente.FechaFin = eleccion.FechaFin;
-            existente.Estado = CalcularEstado(existente, DateTime.Now);
+            existente.Estado = nuevoEstado;
 
             await _context.SaveChangesAsync();
+
             return NoContent();
         }
 
@@ -153,8 +202,7 @@ namespace SistemaVotoAPI.Controllers
                     .Where(j => j.EleccionId == id)
                     .ToListAsync();
 
-                var juntaIds = juntas.Select(j => j.Id).ToList(); // Cambiado de (int)j.Id a j.Id
-
+                var juntaIds = juntas.Select(j => j.Id).ToList();
 
                 var votos = await _context.VotosAnonimos
                     .Where(v => v.EleccionId == id)

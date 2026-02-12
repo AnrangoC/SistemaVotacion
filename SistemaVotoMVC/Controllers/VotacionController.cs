@@ -211,7 +211,7 @@ namespace SistemaVotoMVC.Controllers
             }
 
             // ENVIAMOS TODO JUNTO
-            var resp = await client.PostAsJsonAsync("api/VotosAnonimos/EmitirMultiple", new
+            var resp = await client.PostAsJsonAsync("api/VotosAnonimos/EmitirVotacion", new
             {
                 Cedula = vm.Cedula,
                 EleccionId = vm.EleccionId,

@@ -2,8 +2,10 @@
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
 using SistemaVotoModelos;
+using SistemaVotoModelos.DTOs; // Asegúrate de que los DTOs estén aquí
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Controllers
@@ -19,147 +21,82 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // Registra un solo voto (se mantiene por compatibilidad)
-        [HttpPost("Emitir")]
-        public async Task<IActionResult> Emitir([FromBody] EmitirVotoRequestDto request)
+        // Método para bloquear al votante apenas entra a la papeleta (opcional/seguridad)
+        [HttpPost("validar-y-marcar")]
+        public async Task<IActionResult> ValidarYMarcarVotante([FromBody] ValidacionVotoDto dto)
         {
-            if (request == null)
-                return BadRequest("Datos inválidos.");
+            var votante = await _context.Votantes.FirstOrDefaultAsync(v => v.Cedula == dto.Cedula);
 
-            var cedula = (request.Cedula ?? "").Trim();
-
-            if (string.IsNullOrWhiteSpace(cedula))
-                return BadRequest("Debe enviar cédula.");
-
-            if (request.EleccionId <= 0)
-                return BadRequest("EleccionId inválido.");
-
-            var votante = await _context.Votantes.FindAsync(cedula);
-            if (votante == null || votante.Estado != true)
-                return Unauthorized("Votante no existe o está inactivo.");
-
-            if (votante.HaVotado)
-                return Conflict("El votante ya registró su voto.");
-
-            var eleccion = await _context.Elecciones.FindAsync(request.EleccionId);
-            if (eleccion == null)
-                return BadRequest("La elección no existe.");
-
-            if (eleccion.Estado != "ACTIVA")
-                return BadRequest("La elección no está habilitada.");
-
-            if (!votante.JuntaId.HasValue)
-                return BadRequest("El votante no tiene junta asignada.");
-
-            var junta = await _context.Juntas
-                .FirstOrDefaultAsync(j => j.Id == votante.JuntaId.Value);
-
-            if (junta == null)
-                return BadRequest("No se encontró la junta.");
-
-            var voto = new VotoAnonimo
-            {
-                FechaVoto = DateTime.Now,
-                EleccionId = request.EleccionId,
-                DireccionId = junta.DireccionId,
-                NumeroMesa = junta.NumeroMesa,
-                ListaId = request.ListaId,
-                CedulaCandidato = (request.CedulaCandidato ?? "").Trim(),
-                RolPostulante = (request.RolPostulante ?? "").Trim()
-            };
+            if (votante == null) return NotFound(new { mensaje = "Votante no encontrado." });
+            if (votante.HaVotado) return BadRequest(new { mensaje = "Ya votó en este proceso." });
 
             votante.HaVotado = true;
-
-            _context.VotosAnonimos.Add(voto);
             await _context.SaveChangesAsync();
-
-            return Ok("Voto registrado correctamente.");
+            return Ok(new { mensaje = "Votante marcado preventivamente." });
         }
 
-        // Registra varios votos en una sola operación
-        [HttpPost("EmitirMultiple")]
-        public async Task<IActionResult> EmitirMultiple([FromBody] EmitirMultipleRequestDto request)
+        // MÉTODO PRINCIPAL: Registro de N votos bajo una sola transacción
+        [HttpPost("EmitirVotacion")]
+        public async Task<IActionResult> EmitirVotacion([FromBody] RegistroVotoDto request)
         {
-            if (request == null || request.Votos == null || request.Votos.Count == 0)
-                return BadRequest("No se recibieron votos.");
+            if (request == null || request.Votos == null || !request.Votos.Any())
+                return BadRequest("No se recibieron datos de votación.");
 
-            var cedula = (request.Cedula ?? "").Trim();
+            // 1. Validación del Votante
+            var votante = await _context.Votantes.FindAsync(request.Cedula.Trim());
 
-            if (string.IsNullOrWhiteSpace(cedula))
-                return BadRequest("Debe enviar cédula.");
-
-            if (request.EleccionId <= 0)
-                return BadRequest("EleccionId inválido.");
-
-            var votante = await _context.Votantes.FindAsync(cedula);
             if (votante == null || votante.Estado != true)
-                return Unauthorized("Votante no existe o está inactivo.");
+                return Unauthorized("Votante no habilitado o inexistente.");
 
             if (votante.HaVotado)
-                return Conflict("El votante ya registró su voto.");
+                return Conflict("El sistema detecta que usted ya ha participado en esta elección.");
 
+            // 2. Validación de Elección y Mesa
             var eleccion = await _context.Elecciones.FindAsync(request.EleccionId);
-            if (eleccion == null)
-                return BadRequest("La elección no existe.");
+            if (eleccion == null || eleccion.Estado != "ACTIVA")
+                return BadRequest("La elección no se encuentra activa.");
 
-            if (eleccion.Estado != "ACTIVA")
-                return BadRequest("La elección no está habilitada.");
-
-            if (!votante.JuntaId.HasValue)
-                return BadRequest("El votante no tiene junta asignada.");
-
-            var junta = await _context.Juntas
-                .FirstOrDefaultAsync(j => j.Id == votante.JuntaId.Value);
-
+            var junta = await _context.Juntas.FindAsync(votante.JuntaId);
             if (junta == null)
-                return BadRequest("No se encontró la junta.");
+                return BadRequest("Error: No tiene una mesa de votación asignada.");
 
-            foreach (var v in request.Votos)
+            // 3. PROCESO TRANSACCIONAL (Atómico)
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
             {
-                var voto = new VotoAnonimo
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
                 {
-                    FechaVoto = DateTime.Now,
-                    EleccionId = request.EleccionId,
-                    DireccionId = junta.DireccionId,
-                    NumeroMesa = junta.NumeroMesa,
-                    ListaId = v.ListaId,
-                    CedulaCandidato = (v.CedulaCandidato ?? "").Trim(),
-                    RolPostulante = (v.RolPostulante ?? "").Trim()
-                };
+                    foreach (var v in request.Votos)
+                    {
+                        var nuevoVoto = new VotoAnonimo
+                        {
+                            FechaVoto = DateTime.Now,
+                            EleccionId = request.EleccionId,
+                            DireccionId = junta.DireccionId,
+                            NumeroMesa = junta.NumeroMesa,
+                            ListaId = v.ListaId,
+                            CedulaCandidato = v.CedulaCandidato?.Trim(),
+                            RolPostulante = v.RolPostulante?.Trim()
+                        };
+                        _context.VotosAnonimos.Add(nuevoVoto);
+                    }
 
-                _context.VotosAnonimos.Add(voto);
-            }
+                    // Marcamos que ya participó (esto es lo que se limpia en cada nueva elección activa)
+                    votante.HaVotado = true;
 
-            votante.HaVotado = true;
+                    await _context.SaveChangesAsync();
+                    await transaction.CommitAsync();
 
-            await _context.SaveChangesAsync();
-
-            return Ok("Votos registrados correctamente.");
+                    return Ok(new { mensaje = "Sufragio procesado exitosamente." });
+                }
+                catch (Exception ex)
+                {
+                    await transaction.RollbackAsync();
+                    // Log del error ex si fuera necesario
+                    return StatusCode(500, "Error interno al procesar su votación. Intente de nuevo.");
+                }
+            });
         }
-    }
-
-    // DTO para voto individual
-    public class EmitirVotoRequestDto
-    {
-        public string Cedula { get; set; } = "";
-        public int EleccionId { get; set; }
-        public int ListaId { get; set; }
-        public string? CedulaCandidato { get; set; }
-        public string? RolPostulante { get; set; }
-    }
-
-    // DTO para múltiples votos
-    public class EmitirMultipleRequestDto
-    {
-        public string Cedula { get; set; } = "";
-        public int EleccionId { get; set; }
-        public List<VotoIndividualDto> Votos { get; set; } = new();
-    }
-
-    public class VotoIndividualDto
-    {
-        public int ListaId { get; set; }
-        public string CedulaCandidato { get; set; } = "";
-        public string RolPostulante { get; set; } = "";
     }
 }

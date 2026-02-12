@@ -266,6 +266,41 @@ namespace SistemaVotoAPI.Controllers
 
             return Ok("Juntas creadas.");
         }
-    }
 
+        [HttpGet("DeJefeActual/{cedula}")]
+        public async Task<IActionResult> GetJuntaDeJefeActual(string cedula)
+        {
+            cedula = (cedula ?? "").Trim();
+            if (string.IsNullOrWhiteSpace(cedula))
+                return BadRequest("Cédula inválida.");
+
+            var ahora = DateTime.Now;
+
+            var eleccionActiva = await _context.Elecciones
+                .Where(e => e.FechaInicio <= ahora && e.FechaFin >= ahora)
+                .OrderByDescending(e => e.FechaInicio)
+                .FirstOrDefaultAsync();
+
+            if (eleccionActiva == null)
+                return NotFound("No hay elección activa.");
+
+            var votante = await _context.Votantes.FindAsync(cedula);
+            if (votante == null)
+                return NotFound("Votante no existe.");
+
+            if (votante.RolId != 3)
+                return Conflict("No eres jefe de junta.");
+
+            if (!votante.JuntaId.HasValue)
+                return NotFound("No tienes junta asignada.");
+
+            var junta = await _context.Juntas
+                .FirstOrDefaultAsync(j => j.Id == votante.JuntaId.Value && j.EleccionId == eleccionActiva.Id);
+
+            if (junta == null)
+                return NotFound("Tu junta asignada pertenece a otra elección.");
+
+            return Ok(junta);
+        }
     }
+}

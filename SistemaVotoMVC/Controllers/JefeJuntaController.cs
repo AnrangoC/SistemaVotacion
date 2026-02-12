@@ -73,6 +73,8 @@ namespace SistemaVotoMVC.Controllers
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
+            await client.GetAsync("api/Elecciones");
+
             var resp = await client.GetAsync($"api/Votantes/PorJunta/{juntaId}");
 
             var votantes = resp.IsSuccessStatusCode
@@ -84,6 +86,8 @@ namespace SistemaVotoMVC.Controllers
 
             return View(votantes);
         }
+
+
 
         [HttpPost]
         [ValidateAntiForgeryToken]
