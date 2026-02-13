@@ -1,12 +1,14 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using MailKit;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-using SistemaVotoAPI.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
+using SistemaVotoAPI.Data;
+using SistemaVotoAPI.Services.EmailServices;
 using System;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.DataProtection;
 using System.IO;
 
 // Configuración global para compatibilidad con fechas en PostgreSQL
@@ -14,6 +16,7 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Nuevo
 // Cookies compartidas con MVC (llaves dentro de la solución)
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(
@@ -22,6 +25,8 @@ builder.Services.AddDataProtection()
         )
     )
     .SetApplicationName("SistemaVotoApp");
+
+// Nuevo
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
@@ -29,6 +34,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.SlidingExpiration = true;
     });
 
+// Nuevo
 builder.Services.AddAuthorization();
 
 // Configuración de la base de datos
@@ -83,6 +89,10 @@ builder.Services.AddControllers()
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+
+//Servicio de envío de correos electrónicos
+builder.Services.AddScoped<IEmailService, EmailServices>();
 
 var app = builder.Build();
 

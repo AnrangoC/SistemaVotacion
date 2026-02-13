@@ -8,17 +8,39 @@
             <div class="mb-4">
                 <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
             </div>
+
             <h3 class="fw-bold mb-2">Voto registrado</h3>
+
             @if (TempData["Mensaje"] != null)
             {
                 <div class="text-success fw-bold">@TempData["Mensaje"]</div>
             }
             else
             {
-                <div class="text-success fw-bold">Ha ejercido su derecho al voto correctamente.</div>
+                <div class="text-success fw-bold">
+                    Ha ejercido su derecho al voto correctamente.
+                </div>
             }
+
+            @if (TempData["EmailEnviado"] != null)
+            {
+                if ((bool)TempData["EmailEnviado"])
+                {
+                    <div class="text-success fw-bold mt-2">
+                        Correo enviado correctamente.
+                    </div>
+                }
+                else
+                {
+                    <div class="text-danger fw-bold mt-2">
+                        No se pudo enviar el correo.
+                    </div>
+                }
+            }
+
             <div class="text-muted mt-3 mb-4">
-                Serás redirigido automáticamente en <span id="countdown">5</span> segundos...
+                Serás redirigido automáticamente en
+                <span id="countdown">5</span> segundos...
             </div>
 
             <a href="@Url.Action("Index", "Votacion")" class="btn btn-outline-primary btn-sm">
