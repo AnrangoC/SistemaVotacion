@@ -1,5 +1,6 @@
 ﻿// Nuevo
 using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
@@ -89,6 +90,8 @@ builder.Services.AddControllers()
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+// Registro del servicio de correo electrónico para inyección de dependencias
+builder.Services.AddScoped<IEmailServices,EmailServices>();
 
 
 //Servicio de envío de correos electrónicos
