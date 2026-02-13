@@ -1,5 +1,4 @@
-﻿using MailKit;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
 using SistemaVotoAPI.Services.EmailServices;
@@ -7,6 +6,7 @@ using SistemaVotoAPI.Models;
 using SistemaVotoModelos;
 using SistemaVotoModelos.DTOs;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -17,28 +17,23 @@ namespace SistemaVotoAPI.Controllers
     public class VotosAnonimosController : ControllerBase
     {
         private readonly APIVotosDbContext _context;
-        private readonly IEmailService _emailServices;
+        private readonly IEmailService _emailService; // Inyectamos la interfaz
 
-        public VotosAnonimosController(APIVotosDbContext context, IEmailService emailServices)
+        public VotosAnonimosController(APIVotosDbContext context, IEmailService emailService)
         {
             _context = context;
-            _emailServices = emailServices;
+            _emailService = emailService;
         }
 
         [HttpPost("validar-y-marcar")]
         public async Task<IActionResult> ValidarYMarcarVotante([FromBody] ValidacionVotoDto dto)
         {
             var votante = await _context.Votantes.FirstOrDefaultAsync(v => v.Cedula == dto.Cedula);
-
-            if (votante == null)
-                return NotFound(new { mensaje = "Votante no encontrado." });
-
-            if (votante.HaVotado)
-                return BadRequest(new { mensaje = "Ya votó en este proceso." });
+            if (votante == null) return NotFound(new { mensaje = "Votante no encontrado." });
+            if (votante.HaVotado) return BadRequest(new { mensaje = "Ya votó en este proceso." });
 
             votante.HaVotado = true;
             await _context.SaveChangesAsync();
-
             return Ok(new { mensaje = "Votante marcado preventivamente." });
         }
 
@@ -49,7 +44,6 @@ namespace SistemaVotoAPI.Controllers
                 return BadRequest("No se recibieron datos de votación.");
 
             var votante = await _context.Votantes.FindAsync(request.Cedula.Trim());
-
             if (votante == null || votante.Estado != true)
                 return Unauthorized("Votante no habilitado o inexistente.");
 
@@ -65,11 +59,9 @@ namespace SistemaVotoAPI.Controllers
                 return BadRequest("Error: No tiene una mesa de votación asignada.");
 
             var strategy = _context.Database.CreateExecutionStrategy();
-
             return await strategy.ExecuteAsync(async () =>
             {
                 using var transaction = await _context.Database.BeginTransactionAsync();
-
                 try
                 {
                     foreach (var v in request.Votos)
@@ -84,50 +76,37 @@ namespace SistemaVotoAPI.Controllers
                             CedulaCandidato = v.CedulaCandidato?.Trim(),
                             RolPostulante = v.RolPostulante?.Trim()
                         };
-
                         _context.VotosAnonimos.Add(nuevoVoto);
                     }
 
                     votante.HaVotado = true;
-
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
 
-                    bool emailEnviado = true;
-
-                    if (!string.IsNullOrEmpty(votante.Email))
+                    // --- ENVÍO DE EMAIL TRAS VOTO EXITOSO ---
+                    try
                     {
-                        try
+                        var emailRequest = new EmailDto
                         {
-                            var emailMessage = new EmailDto
-                            {
-                                To = votante.Email,
-                                Subject = "Voto Registrado",
-                                Body = $@"Su voto fue registrado correctamente.
-Fecha: {DateTime.Now}
-Elección: {request.EleccionId}
-Mesa: {junta.NumeroMesa}"
-                            };
+                            To = votante.Email, // Asegúrate que el campo se llame 'Correo' o 'Email' en tu modelo
+                            Subject = "Certificado de Sufragio - Sistema de Votación",
+                            Body = $"<h1>¡Gracias por votar!</h1><p>Estimado {votante.NombreCompleto}, adjuntamos su certificado de votación electrónica.</p>"
+                        };
 
-                            _emailServices.SendEmail(emailMessage, null, null);
-                        }
-                        catch
-                        {
-                            emailEnviado = false;
-                        }
+                        // Aquí deberías tener la lógica que genera el PDF en bytes. 
+                        // Por ahora pasamos un array vacío o el archivo generado.
+                        byte[] archivoPdf = new byte[0];
+
+                        _emailService.SendEmail(emailRequest, archivoPdf, $"Certificado_{votante.Cedula}.pdf");
                     }
-                    else
+                    catch (Exception)
                     {
-                        emailEnviado = false;
+                        // No lanzamos error para no afectar la experiencia del usuario si solo falla el mail
                     }
 
-                    return Ok(new
-                    {
-                        mensaje = "Sufragio procesado exitosamente.",
-                        emailEnviado = emailEnviado
-                    });
+                    return Ok(new { mensaje = "Sufragio procesado exitosamente." });
                 }
-                catch
+                catch (Exception ex)
                 {
                     await transaction.RollbackAsync();
                     return StatusCode(500, "Error interno al procesar su votación.");

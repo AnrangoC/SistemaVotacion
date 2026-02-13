@@ -92,6 +92,7 @@ builder.Services.AddSwaggerGen();
 
 
 //Servicio de envío de correos electrónicos
+// Registrar el servicio de Email
 builder.Services.AddScoped<IEmailService, EmailServices>();
 
 var app = builder.Build();
