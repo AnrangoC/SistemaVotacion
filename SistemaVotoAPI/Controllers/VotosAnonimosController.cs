@@ -22,7 +22,7 @@ namespace SistemaVotoAPI.Controllers
             _emailServices = emailServices;  // Asegúrate de que la inyección de dependencias esté aquí.
         }
 
-        // El token se usa solo para ingresar al sistema en el cliente MVC
+        // El token se usa solo para ingresar al sistema en el cliente MV
         [HttpPost("Emitir")]
         public async Task<IActionResult> Emitir([FromBody] EmitirVotoRequestDto request)
         {
