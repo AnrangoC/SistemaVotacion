@@ -3,10 +3,11 @@ using MailKit.Security;
 using Microsoft.Extensions.Configuration;
 using MimeKit;
 using SistemaVotoAPI.Models;
+using System.Threading.Tasks;
 
 namespace SistemaVotoAPI.Services.EmailServices
 {
-    public class EmailServices: IEmailService
+    public class EmailServices : IEmailService
     {
         private readonly IConfiguration _config;
 
@@ -16,7 +17,7 @@ namespace SistemaVotoAPI.Services.EmailServices
 
         }
 
-        public void SendEmail(EmailDto request, byte[] attachment, string fileName)
+        public async Task SendEmail(EmailDto request, byte[] attachment, string fileName)
         {
             var email = new MimeMessage();
             // Leemos el remitente desde tu appsettings.json
@@ -29,10 +30,7 @@ namespace SistemaVotoAPI.Services.EmailServices
             builder.HtmlBody = request.Body;
 
             // Adjuntamos el PDF generado
-            if (attachment != null && fileName != null)
-            {
-                builder.Attachments.Add(fileName, attachment);
-            }
+            builder.Attachments.Add(fileName, attachment);
 
             email.Body = builder.ToMessageBody();
 

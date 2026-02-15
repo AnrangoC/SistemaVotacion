@@ -95,12 +95,21 @@ builder.Services.AddSwaggerGen();
 // Registrar el servicio de Email
 builder.Services.AddScoped<IEmailService, EmailServices>();
 
+//Configuración del directorio para archivos estáticos (imágenes, etc.)
+builder.Environment.WebRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+
+// Configuración de QuestPDF para generación de PDFs
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
+
 var app = builder.Build();
 
 // Middleware de documentación
 
 app.UseSwagger();
 app.UseSwaggerUI();
+
+// Middleware para servir archivos estáticos (imágenes, PDFs, etc.)
+app.UseStaticFiles();
 
 // Pipeline final de la aplicación
 

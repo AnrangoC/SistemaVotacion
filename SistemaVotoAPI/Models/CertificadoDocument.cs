@@ -14,7 +14,7 @@ namespace SistemaVotoAPI.Models
 
         public void Compose(IDocumentContainer container)
         {
-            // --- PÁGINA 1: ANVERSO ---
+            // --- PÁGINA 1: ANVERSO (AJUSTADO) ---
             container.Page(page =>
             {
                 page.Size(PageSizes.A4.Landscape());
@@ -23,80 +23,92 @@ namespace SistemaVotoAPI.Models
 
                 page.Content().Column(col =>
                 {
-                    col.Spacing(10);
+                    col.Spacing(5);
 
-                    // Encabezado
+                    // 1. ENCABEZADO
                     col.Item().Row(row =>
                     {
-                        row.ConstantItem(200).AlignLeft().Row(r => {
-                            r.AutoItem().Height(65).Image(CertificadoVotacion.RutaEscudo);
-                            r.AutoItem().PaddingLeft(15).Height(65).Image(CertificadoVotacion.RutaCne);
+                        row.ConstantItem(250).AlignLeft().Row(r => {
+                            r.AutoItem().Height(80).Image(CertificadoVotacion.RutaEscudo).FitHeight();
+                            r.AutoItem().PaddingLeft(10).Height(80).Image(CertificadoVotacion.RutaCne).FitHeight();
                         });
 
-                        row.RelativeItem().Column(c => {
-                            c.Item().AlignCenter().Text("CERTIFICADO DE VOTACIÓN").FontSize(30).Bold().FontColor(Colors.Blue.Darken3);
-                            c.Item().AlignCenter().Background(Colors.Blue.Medium).PaddingHorizontal(20).PaddingVertical(5)
-                                    .Text(CertificadoVotacion.FechaElectoral).FontSize(14).Bold().FontColor(Colors.White);
+                        row.RelativeItem().PaddingTop(10).Column(c => {
+                            c.Item().AlignCenter().Text("CERTIFICADO DE VOTACIÓN").FontSize(30).ExtraBold().FontColor(Colors.Blue.Darken3);
+                            c.Item().AlignCenter().Background(Colors.Blue.Medium).PaddingHorizontal(25).PaddingVertical(3)
+                                    .Text(CertificadoVotacion.FechaElectoral).FontSize(15).Bold().FontColor(Colors.White);
                         });
 
-                        // Sección QR
-                        row.ConstantItem(120).AlignRight().Column(qrCol =>
-                        {
-                            qrCol.Item().Width(80).Height(80).Border(0.5f).BorderColor(Colors.Grey.Lighten2).AlignCenter().AlignMiddle().Image(CertificadoVotacion.RutaQr);
-                        });
+                        row.ConstantItem(140).AlignRight().Height(100).Image(CertificadoVotacion.RutaQr).FitHeight();
                     });
 
-                    col.Item().LineHorizontal(2f).LineColor(Colors.Blue.Medium);
+                    col.Item().PaddingVertical(5).LineHorizontal(2f).LineColor(Colors.Blue.Medium);
 
-                    // CUERPO
+                    // 2. CUERPO AJUSTADO
                     col.Item().Row(row =>
                     {
-                        // 1. Barras grises laterales
-                        row.ConstantItem(40).Background(Colors.Grey.Lighten3).AlignCenter().Column(c => {
-                            for (int i = 0; i < 18; i++) c.Item().PaddingVertical(5).Text("||||||").FontSize(12).FontColor(Colors.Grey.Medium);
+                        // CÓDIGO DE BARRAS MÁS LARGO (Hasta el nivel del CC)
+                        row.ConstantItem(50).PaddingVertical(2).Column(c =>
+                        {
+                            // Aumentamos a 45 repeticiones para que baje hasta el nivel de la cédula
+                            for (int i = 0; i < 45; i++)
+                            {
+                                c.Item().Height(3).Background(Colors.Black);
+                                c.Item().Height(2);
+                                c.Item().Height(1.5f).Background(Colors.Black);
+                                c.Item().Height(2);
+                            }
                         });
 
-                        // 2. DATOS PERSONALES (Con colores mixtos)
-                        row.RelativeItem().PaddingLeft(30).PaddingTop(35).Column(c =>
+                        row.RelativeItem().PaddingLeft(25).Column(mainCol =>
                         {
-                            c.Item().PaddingTop(20).AlignCenter().Text(CertificadoVotacion.Nombre).FontSize(24).Bold();
-                            c.Spacing(5);
+                            // Nombre del Votante
+                            mainCol.Item().PaddingBottom(5).Text(CertificadoVotacion.Nombre).FontSize(34).ExtraBold();
 
-                            // PROVINCIA
-                            c.Item().PaddingBottom(5).Text(t => {
-                                t.Span("PROVINCIA: ").FontSize(16).Bold();
-                                t.Span(CertificadoVotacion.Provincia).FontSize(16).FontColor(Colors.Blue.Darken3).Bold();
+                            mainCol.Item().Row(contentRow =>
+                            {
+                                // DATOS IZQUIERDA (Alineados con la foto)
+                                contentRow.RelativeItem().PaddingRight(10).PaddingTop(35).Column(info =>
+                                {
+                                    // Espaciado mayor entre bloques para separar Provincia, Cantón y Parroquia
+                                    info.Spacing(22);
+
+                                    var fields = new[] {
+                            ("PROVINCIA", CertificadoVotacion.Provincia),
+                            ("CIRCUNSCRIPCIÓN", "ÚNICA"),
+                            ("CANTÓN", CertificadoVotacion.Canton),
+                            ("PARROQUIA", CertificadoVotacion.Parroquia)
+                            // Se eliminaron ZONA y JUNTA
+                        };
+
+                                    foreach (var (label, value) in fields)
+                                    {
+                                        info.Item().Text(t => {
+                                            t.Span($"{label}: ").FontSize(19).Bold().FontColor(Colors.Blue.Medium);
+                                            t.Span(value).FontSize(19).Bold().FontColor(Colors.Black);
+                                        });
+                                    }
+                                });
+
+                                // FOTO DERECHA Y NÚMEROS
+                                contentRow.ConstantItem(220).AlignRight().Column(fCol =>
+                                {
+                                    // Número de certificado (Referencia para el inicio de los campos)
+                                    fCol.Item().PaddingBottom(5).AlignRight().Text(t => {
+                                        t.Span("N° ").FontSize(16).Bold().FontColor(Colors.Blue.Medium);
+                                        t.Span(CertificadoVotacion.CertificadoNo).FontSize(18).Bold();
+                                    });
+
+                                    // Foto
+                                    fCol.Item().Width(190).Height(250).Border(2f).BorderColor(Colors.Black).Image(CertificadoVotacion.FotoBytes).FitArea();
+
+                                    // CC debajo de la foto
+                                    fCol.Item().AlignCenter().Width(190).PaddingTop(8).Text(t => {
+                                        t.Span("CC N°: ").FontSize(17).Bold().FontColor(Colors.Blue.Medium);
+                                        t.Span(CertificadoVotacion.Cedula).FontSize(18).ExtraBold();
+                                    });
+                                });
                             });
-
-                            // CIRCUNSCRIPCIÓN
-                            c.Item().PaddingBottom(5).Text(t => {
-                                t.Span("CIRCUNSCRIPCIÓN: ").FontSize(16).Bold();
-                                t.Span("").FontSize(16).FontColor(Colors.Blue.Darken3).Bold();
-                            });
-
-                            // CANTÓN
-                            c.Item().PaddingBottom(5).Text(t => {
-                                t.Span("CANTÓN: ").FontSize(16).Bold();
-                                t.Span(CertificadoVotacion.Canton).FontSize(16).FontColor(Colors.Blue.Darken3).Bold();
-                            });
-
-                            // PARROQUIA
-                            c.Item().PaddingBottom(5).Text(t => {
-                                t.Span("PARROQUIA: ").FontSize(16).Bold();
-                                t.Span(CertificadoVotacion.Parroquia).FontSize(16).FontColor(Colors.Blue.Darken3).Bold();
-                            });
-
-
-
-
-                        });
-
-                        // 3. FOTO Y CÉDULA
-                        row.ConstantItem(220).PaddingTop(60).Column(c =>
-                        {
-                            c.Item().AlignRight().PaddingBottom(5).Text($"N° {CertificadoVotacion.CertificadoNo}").FontSize(11).Bold().Italic();
-                            c.Item().Width(120).Height(150).Border(0.5f).Padding(2).Image(CertificadoVotacion.FotoBytes);
-                            c.Item().AlignCenter().PaddingTop(5).Text($"CC N°: {CertificadoVotacion.Cedula}").FontSize(14).Bold();
                         });
                     });
                 });

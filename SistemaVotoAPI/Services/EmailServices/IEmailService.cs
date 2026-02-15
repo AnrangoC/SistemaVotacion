@@ -1,9 +1,9 @@
 ﻿using SistemaVotoAPI.Models;
-
+using System.Threading.Tasks;
 namespace SistemaVotoAPI.Services.EmailServices
 {
     public interface IEmailService
     {
-        void SendEmail(EmailDto request, byte[] attachment, string fileName);
+        Task SendEmail(EmailDto request, byte[] attachment, string fileName);
     }
 }
