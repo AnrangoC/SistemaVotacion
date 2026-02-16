@@ -168,10 +168,10 @@ namespace SistemaVotoAPI.Controllers
 
                     return Ok(new { mensaje = "Sufragio procesado exitosamente." });
                 }
-                catch (Exception ex)
+                catch
                 {
                     await transaction.RollbackAsync();
-                    return StatusCode(500, "Error interno al procesar su votación.");
+                    return StatusCode(500, "Error interno al procesar su votación. Intente de nuevo.");
                 }
             });
         }
