@@ -2,7 +2,6 @@
 using Microsoft.EntityFrameworkCore;
 using SistemaVotoAPI.Data;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -19,7 +18,6 @@ namespace SistemaVotoAPI.Controllers
             _context = context;
         }
 
-        // GET: api/Resultados/Generales
         [HttpGet("Generales")]
         public async Task<IActionResult> ResultadosGenerales(int? eleccionId = null)
         {
@@ -39,71 +37,85 @@ namespace SistemaVotoAPI.Controllers
                 eid = ultima.Id;
             }
 
-            // Query validando juntas aprobadas
-            var votos = from v in _context.VotosAnonimos
-                        join j in _context.Juntas
-                        on new { v.EleccionId, v.DireccionId, v.NumeroMesa }
-                        equals new { j.EleccionId, j.DireccionId, j.NumeroMesa }
-                        where v.EleccionId == eid && j.Estado == 4
-                        select v;
+            // OJO: ya NO filtramos por CedulaCandidato, para incluir BLANCO
+            var votosValidos =
+                from v in _context.VotosAnonimos
+                join j in _context.Juntas
+                    on new { v.EleccionId, v.DireccionId, v.NumeroMesa }
+                    equals new { j.EleccionId, j.DireccionId, j.NumeroMesa }
+                where v.EleccionId == eid
+                      && j.Estado == 4
+                select v;
 
-            // Agrupar por Rol + Lista
-            var conteo = await votos
-                .GroupBy(v => new { v.RolPostulante, v.ListaId })
+            // Conteo por Rol + (CedulaCandidato o BLANCO)
+            var conteo = await votosValidos
+                .GroupBy(v => new
+                {
+                    v.RolPostulante,
+                    CedulaKey = string.IsNullOrWhiteSpace(v.CedulaCandidato) ? "BLANCO" : v.CedulaCandidato
+                })
                 .Select(g => new
                 {
                     Rol = g.Key.RolPostulante,
-                    ListaId = g.Key.ListaId,
+                    CedulaCandidato = g.Key.CedulaKey,
                     TotalVotos = g.Count()
                 })
                 .ToListAsync();
 
-            // Agrupar por Rol para armar secciones
-            var roles = conteo
+            // Candidatos de ESTA elección con Votante y Lista
+            var candidatos = await _context.Candidatos
+                .Include(c => c.Votante)
+                .Include(c => c.Lista)
+                .Where(c => c.EleccionId == eid)
+                .ToListAsync();
+
+            var candidatosDict = candidatos
+                .GroupBy(c => c.Cedula)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var resultadoFinal = conteo
                 .GroupBy(x => x.Rol)
-                .Select(gr => new
+                .Select(gr =>
                 {
-                    Rol = string.IsNullOrWhiteSpace(gr.Key) ? "SIN CARGO" : gr.Key,
-                    TotalRol = gr.Sum(x => x.TotalVotos),
-                    Detalle = gr.Select(x => new
+                    var rolNombre = string.IsNullOrWhiteSpace(gr.Key) ? "SIN CARGO" : gr.Key;
+                    var totalRol = gr.Sum(x => x.TotalVotos);
+
+                    var detalle = gr.Select(x =>
                     {
-                        ListaId = x.ListaId,
-                        Votos = x.TotalVotos
-                    }).ToList()
+                        var esBlanco = x.CedulaCandidato == "BLANCO";
+
+                        candidatosDict.TryGetValue(x.CedulaCandidato, out var cand);
+
+                        double porcentaje = totalRol > 0
+                            ? (double)x.TotalVotos / totalRol * 100
+                            : 0;
+
+                        return new
+                        {
+                            CedulaCandidato = esBlanco ? "" : x.CedulaCandidato,
+                            NombrePostulante = esBlanco
+                                ? "Blanco"
+                                : (cand?.Votante?.NombreCompleto ?? "CANDIDATO NO ENCONTRADO"),
+                            FotoPostulante = esBlanco ? null : cand?.Votante?.FotoUrl,
+                            ListaId = esBlanco ? 0 : (cand?.ListaId ?? 0),
+                            NombreLista = esBlanco ? "Blanco" : (cand?.Lista?.NombreLista ?? ""),
+                            Logo = esBlanco ? null : cand?.Lista?.LogoUrl,
+                            Votos = x.TotalVotos,
+                            Porcentaje = Math.Round(porcentaje, 2)
+                        };
+                    })
+                    .OrderByDescending(d => d.Votos)
+                    .ToList();
+
+                    return new
+                    {
+                        Rol = rolNombre,
+                        TotalRol = totalRol,
+                        Ganador = detalle.FirstOrDefault(),
+                        Detalle = detalle
+                    };
                 })
                 .ToList();
-
-            // Armar respuesta final con nombres de listas
-            var resultadoFinal = new List<object>();
-
-            foreach (var rol in roles)
-            {
-                var detalleFinal = new List<object>();
-
-                foreach (var item in rol.Detalle)
-                {
-                    var lista = await _context.Listas.FindAsync(item.ListaId);
-
-                    double porcentaje = rol.TotalRol > 0
-                        ? (double)item.Votos / rol.TotalRol * 100
-                        : 0;
-
-                    detalleFinal.Add(new
-                    {
-                        NombreLista = lista?.NombreLista ?? "Blanco",
-                        Logo = lista?.LogoUrl,
-                        Votos = item.Votos,
-                        Porcentaje = Math.Round(porcentaje, 2)
-                    });
-                }
-
-                resultadoFinal.Add(new
-                {
-                    Rol = rol.Rol,
-                    TotalRol = rol.TotalRol,
-                    Detalle = detalleFinal.OrderByDescending(x => ((dynamic)x).Votos)
-                });
-            }
 
             return Ok(new
             {
@@ -112,7 +124,6 @@ namespace SistemaVotoAPI.Controllers
             });
         }
 
-        // GET: api/Resultados/PorDireccion
         [HttpGet("PorDireccion")]
         public async Task<IActionResult> ResultadosPorDireccion(
             string provincia,
@@ -139,72 +150,91 @@ namespace SistemaVotoAPI.Controllers
                 eid = ultima.Id;
             }
 
-            var votos = from v in _context.VotosAnonimos
-                        join d in _context.Direcciones on v.DireccionId equals d.Id
-                        join j in _context.Juntas
-                        on new { v.EleccionId, v.DireccionId, v.NumeroMesa }
-                        equals new { j.EleccionId, j.DireccionId, j.NumeroMesa }
-                        where v.EleccionId == eid
-                        && j.Estado == 4
-                        && d.Provincia == provincia
-                        select new { v, d };
+            //
+            var votosValidos =
+                from v in _context.VotosAnonimos
+                join d in _context.Direcciones on v.DireccionId equals d.Id
+                join j in _context.Juntas
+                    on new { v.EleccionId, v.DireccionId, v.NumeroMesa }
+                    equals new { j.EleccionId, j.DireccionId, j.NumeroMesa }
+                where v.EleccionId == eid
+                      && j.Estado == 4
+                      && d.Provincia == provincia
+                select new { v, d };
 
             if (!string.IsNullOrWhiteSpace(canton))
-                votos = votos.Where(x => x.d.Canton == canton);
+                votosValidos = votosValidos.Where(x => x.d.Canton == canton);
 
             if (!string.IsNullOrWhiteSpace(parroquia))
-                votos = votos.Where(x => x.d.Parroquia == parroquia);
+                votosValidos = votosValidos.Where(x => x.d.Parroquia == parroquia);
 
-            var conteo = await votos
-                .GroupBy(x => new { x.v.RolPostulante, x.v.ListaId })
+            var conteo = await votosValidos
+                .GroupBy(x => new
+                {
+                    x.v.RolPostulante,
+                    CedulaKey = string.IsNullOrWhiteSpace(x.v.CedulaCandidato) ? "BLANCO" : x.v.CedulaCandidato
+                })
                 .Select(g => new
                 {
                     Rol = g.Key.RolPostulante,
-                    ListaId = g.Key.ListaId,
+                    CedulaCandidato = g.Key.CedulaKey,
                     TotalVotos = g.Count()
                 })
                 .ToListAsync();
 
-            var roles = conteo
+            var candidatos = await _context.Candidatos
+                .Include(c => c.Votante)
+                .Include(c => c.Lista)
+                .Where(c => c.EleccionId == eid)
+                .ToListAsync();
+
+            var candidatosDict = candidatos
+                .GroupBy(c => c.Cedula)
+                .ToDictionary(g => g.Key, g => g.First());
+
+            var resultadoFinal = conteo
                 .GroupBy(x => x.Rol)
-                .Select(gr => new
+                .Select(gr =>
                 {
-                    Rol = string.IsNullOrWhiteSpace(gr.Key) ? "SIN CARGO" : gr.Key,
-                    TotalRol = gr.Sum(x => x.TotalVotos),
-                    Detalle = gr.ToList()
+                    var rolNombre = string.IsNullOrWhiteSpace(gr.Key) ? "SIN CARGO" : gr.Key;
+                    var totalRol = gr.Sum(x => x.TotalVotos);
+
+                    var detalle = gr.Select(x =>
+                    {
+                        var esBlanco = x.CedulaCandidato == "BLANCO";
+
+                        candidatosDict.TryGetValue(x.CedulaCandidato, out var cand);
+
+                        double porcentaje = totalRol > 0
+                            ? (double)x.TotalVotos / totalRol * 100
+                            : 0;
+
+                        return new
+                        {
+                            CedulaCandidato = esBlanco ? "" : x.CedulaCandidato,
+                            NombrePostulante = esBlanco
+                                ? "Blanco"
+                                : (cand?.Votante?.NombreCompleto ?? "CANDIDATO NO ENCONTRADO"),
+                            FotoPostulante = esBlanco ? null : cand?.Votante?.FotoUrl,
+                            ListaId = esBlanco ? 0 : (cand?.ListaId ?? 0),
+                            NombreLista = esBlanco ? "Blanco" : (cand?.Lista?.NombreLista ?? ""),
+                            Logo = esBlanco ? null : cand?.Lista?.LogoUrl,
+                            Votos = x.TotalVotos,
+                            Porcentaje = Math.Round(porcentaje, 2)
+                        };
+                    })
+                    .OrderByDescending(d => d.Votos)
+                    .ToList();
+
+                    return new
+                    {
+                        Rol = rolNombre,
+                        TotalRol = totalRol,
+                        Ganador = detalle.FirstOrDefault(),
+                        Detalle = detalle
+                    };
                 })
                 .ToList();
-
-            var resultadoFinal = new List<object>();
-
-            foreach (var rol in roles)
-            {
-                var detalleFinal = new List<object>();
-
-                foreach (var item in rol.Detalle)
-                {
-                    var lista = await _context.Listas.FindAsync(item.ListaId);
-
-                    double porcentaje = rol.TotalRol > 0
-                        ? (double)item.TotalVotos / rol.TotalRol * 100
-                        : 0;
-
-                    detalleFinal.Add(new
-                    {
-                        NombreLista = lista?.NombreLista ?? "Blanco",
-                        Logo = lista?.LogoUrl,
-                        Votos = item.TotalVotos,
-                        Porcentaje = Math.Round(porcentaje, 2)
-                    });
-                }
-
-                resultadoFinal.Add(new
-                {
-                    Rol = rol.Rol,
-                    TotalRol = rol.TotalRol,
-                    Detalle = detalleFinal.OrderByDescending(x => ((dynamic)x).Votos)
-                });
-            }
 
             return Ok(new
             {
