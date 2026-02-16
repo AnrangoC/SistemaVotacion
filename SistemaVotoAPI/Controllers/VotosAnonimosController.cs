@@ -156,7 +156,8 @@ namespace SistemaVotoAPI.Controllers
                                 Subject = "Certificado de Votación Oficial - Elecciones " + DateTime.Now.Year,
                                 Body = $"Hola {votante.NombreCompleto}, adjuntamos tu certificado de votación."
                             };
-                            _emailService.SendEmail(emailDto, pdfBytes, $"Certificado{votante.Cedula}.pdf");
+
+                            await _emailService.SendEmail(emailDto, pdfBytes, $"Certificado{votante.Cedula}.pdf");
                         }
                         catch
                         {
@@ -167,10 +168,10 @@ namespace SistemaVotoAPI.Controllers
 
                     return Ok(new { mensaje = "Sufragio procesado exitosamente." });
                 }
-                catch
+                catch (Exception ex)
                 {
                     await transaction.RollbackAsync();
-                    return StatusCode(500, "Error interno al procesar su votación. Intente de nuevo.");
+                    return StatusCode(500, "Error interno al procesar su votación.");
                 }
             });
         }
