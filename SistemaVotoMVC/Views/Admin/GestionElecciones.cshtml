@@ -4,15 +4,25 @@
     ViewData["Title"] = "Gestión de Elecciones";
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
         <h3 class="fw-bold mb-0">🗳️ Gestión de Elecciones</h3>
         <small class="text-muted">El estado se calcula automáticamente según fecha y hora.</small>
     </div>
 
-    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalNueva">
-        <i class="bi bi-plus-circle"></i> Nueva Elección
-    </button>
+    <div class="d-flex gap-2">
+        <a asp-controller="Admin"
+           asp-action="Main"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Volver a Main
+        </a>
+
+        <button class="btn btn-success"
+                data-bs-toggle="modal"
+                data-bs-target="#modalNueva">
+            <i class="bi bi-plus-circle"></i> Nueva Elección
+        </button>
+    </div>
 </div>
 
 @if (TempData["Mensaje"] != null)
@@ -57,10 +67,13 @@
                             <td class="fw-semibold">@e.Titulo</td>
                             <td>@e.FechaInicio.ToString("yyyy-MM-dd HH:mm")</td>
                             <td>@e.FechaFin.ToString("yyyy-MM-dd HH:mm")</td>
-                            <td><span class="badge @badge">@e.Estado</span></td>
+                            <td>
+                                <span class="badge @badge">@e.Estado</span>
+                            </td>
 
                             <td class="text-end">
                                 <div class="btn-group" role="group">
+
                                     <button class="btn btn-outline-primary btn-sm"
                                             type="button"
                                             data-id="@e.Id"
@@ -91,7 +104,7 @@
                                           onsubmit="return confirm('¿Eliminar esta elección?');">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="id" value="@e.Id" />
-                                        <button class="btn btn-outline-danger btn-sm" type="submit" title="Eliminar">
+                                        <button class="btn btn-outline-danger btn-sm" type="submit">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
@@ -102,10 +115,11 @@
                                           onsubmit="return confirm('Esta acción eliminará juntas, listas, candidatos y votos asociados.\n\n¿Eliminar la elección de todas formas?');">
                                         @Html.AntiForgeryToken()
                                         <input type="hidden" name="id" value="@e.Id" />
-                                        <button class="btn btn-danger btn-sm" type="submit" title="Eliminar de todas formas">
+                                        <button class="btn btn-danger btn-sm" type="submit">
                                             <i class="bi bi-exclamation-triangle"></i>
                                         </button>
                                     </form>
+
                                 </div>
                             </td>
                         </tr>
@@ -116,10 +130,12 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalNueva" tabindex="-1" aria-hidden="true">
+<!-- MODAL NUEVA -->
+<div class="modal fade" id="modalNueva" tabindex="-1">
     <div class="modal-dialog">
         <form asp-controller="Admin" asp-action="CrearEleccion" method="post" class="modal-content">
             @Html.AntiForgeryToken()
+
             <div class="modal-header bg-success text-white">
                 <h5 class="modal-title">Nueva Elección</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
@@ -147,7 +163,8 @@
     </div>
 </div>
 
-<div class="modal fade" id="modalEditar" tabindex="-1" aria-hidden="true">
+<!-- MODAL EDITAR -->
+<div class="modal fade" id="modalEditar" tabindex="-1">
     <div class="modal-dialog">
         <form asp-controller="Admin" asp-action="EditarEleccion" method="post" class="modal-content">
             @Html.AntiForgeryToken()
@@ -168,10 +185,6 @@
 
                 <label class="fw-bold">Fecha y hora de fin</label>
                 <input name="FechaFin" id="editFin" type="datetime-local" class="form-control" required />
-
-                <small class="text-muted d-block mt-2">
-                    El estado se recalcula automáticamente.
-                </small>
             </div>
 
             <div class="modal-footer">
@@ -184,15 +197,10 @@
 @section Scripts {
     <script>
         function abrirEditar(btn) {
-            const id = btn.getAttribute("data-id");
-            const titulo = btn.getAttribute("data-titulo");
-            const inicio = btn.getAttribute("data-inicio");
-            const fin = btn.getAttribute("data-fin");
-
-            document.getElementById("editId").value = id;
-            document.getElementById("editTitulo").value = titulo;
-            document.getElementById("editInicio").value = inicio;
-            document.getElementById("editFin").value = fin;
+            document.getElementById("editId").value = btn.getAttribute("data-id");
+            document.getElementById("editTitulo").value = btn.getAttribute("data-titulo");
+            document.getElementById("editInicio").value = btn.getAttribute("data-inicio");
+            document.getElementById("editFin").value = btn.getAttribute("data-fin");
 
             new bootstrap.Modal(document.getElementById("modalEditar")).show();
         }

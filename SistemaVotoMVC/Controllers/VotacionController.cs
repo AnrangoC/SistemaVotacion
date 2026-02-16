@@ -155,7 +155,7 @@ namespace SistemaVotoMVC.Controllers
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
-            // 🔥 Volver a cargar candidatos (POST pierde listas)
+            // Volver a cargar candidatos (POST pierde listas)
             var elec = await client.GetFromJsonAsync<Eleccion>($"api/Elecciones/{vm.EleccionId}");
             if (elec == null)
             {

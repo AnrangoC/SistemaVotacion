@@ -141,7 +141,7 @@ namespace SistemaVotoAPI.Controllers
 
             var estadoAnterior = existente.Estado;
 
-            // OJO: aquí el nuevo estado debe calcularse con las fechas NUEVAS (eleccion)
+            // aquí el nuevo estado debe calcularse con las fechas NUEVAS (eleccion)
             var nuevoEstado = CalcularEstado(eleccion, DateTime.Now);
 
             // RESET MASIVO si (por alguna razón) desde aquí llega a pasar a ACTIVA

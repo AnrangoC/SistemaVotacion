@@ -6,7 +6,7 @@
     var elecciones = ViewBag.Elecciones as List<SistemaVotoModelos.Eleccion> ?? new List<SistemaVotoModelos.Eleccion>();
 }
 
-<div class="d-flex justify-content-between align-items-center mb-3">
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <div>
         <h3 class="fw-bold mb-0">Gestión de Juntas</h3>
         <small class="text-muted">
@@ -14,11 +14,24 @@
         </small>
     </div>
 
-    <button class="btn btn-primary"
-            data-bs-toggle="modal"
-            data-bs-target="#modalCrearJuntas">
-        <i class="bi bi-plus-circle"></i> Crear juntas
-    </button>
+    <div class="d-flex gap-2">
+        <a asp-controller="Admin"
+           asp-action="Main"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Volver a Main
+        </a>
+        <a asp-controller="Admin"
+           asp-action="GestionVotantes"
+           class="btn btn-outline-dark">
+            <i class="bi bi-people"></i> Gestión de Votantes
+        </a>
+        <button class="btn btn-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#modalCrearJuntas">
+            <i class="bi bi-plus-circle"></i> Crear juntas
+        </button>
+
+    </div>
 </div>
 
 @if (TempData["Mensaje"] != null)
@@ -68,7 +81,7 @@
                                 <td>
                                     @if (string.IsNullOrEmpty(j.NombreJefe) || j.NombreJefe == "Sin asignar")
                                     {
-                                        <span class="text-muted italic small">Sin asignar</span>
+                                        <span class="text-muted small">Sin asignar</span>
                                     }
                                     else
                                     {
@@ -85,7 +98,7 @@
                                             <span class="badge bg-success">En Votación</span>
                                             break;
                                         case 3:
-                                            <span class="badge bg-warning text-dark animate-pulse">En Espera</span>
+                                            <span class="badge bg-warning text-dark">En Espera</span>
                                             break;
                                         case 4:
                                             <span class="badge bg-primary">Aprobada</span>
@@ -104,15 +117,17 @@
     </div>
 </div>
 
-@* El modal permanece intacto para no dañar la creación masiva *@
+<!-- MODAL CREAR JUNTAS -->
 <div class="modal fade" id="modalCrearJuntas" tabindex="-1">
     <div class="modal-dialog">
         <form asp-controller="Juntas" asp-action="CrearJuntaPorDireccion" method="post" class="modal-content">
             @Html.AntiForgeryToken()
+
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title">Configuración de Mesas</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
+
             <div class="modal-body">
                 <label class="fw-bold mb-1">Elección</label>
                 <select name="eleccionId" class="form-select mb-3" required>
@@ -135,6 +150,7 @@
                 <label class="fw-bold mb-1">Número de Mesas a crear</label>
                 <input name="cantidad" type="number" class="form-control" min="1" placeholder="Ej: 5" required />
             </div>
+
             <div class="modal-footer">
                 <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancelar</button>
                 <button class="btn btn-primary" type="submit">Generar Mesas</button>

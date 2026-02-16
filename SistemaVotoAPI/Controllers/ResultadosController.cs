@@ -37,7 +37,7 @@ namespace SistemaVotoAPI.Controllers
                 eid = ultima.Id;
             }
 
-            // OJO: ya NO filtramos por CedulaCandidato, para incluir BLANCO
+            // Ya NO filtramos por CedulaCandidato, para incluir Voto en BLANCO
             var votosValidos =
                 from v in _context.VotosAnonimos
                 join j in _context.Juntas

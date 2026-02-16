@@ -93,12 +93,6 @@
                                 <td class="fw-semibold">@c.RolPostulante</td>
                                 <td class="text-end">
                                     <div class="btn-group">
-                                        <button class="btn btn-outline-primary btn-sm"
-                                                onclick="abrirEditar(@c.Id, @c.EleccionId, @c.ListaId, '@(c.RolPostulante?.Replace("'", "\\'"))')"
-                                                @(eleccion != null && eleccion.Estado != "CONFIGURACION" ? "disabled" : "")>
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-
                                         <form asp-controller="Admin" asp-action="EliminarCandidato" method="post"
                                               onsubmit="return confirm('¿Eliminar este candidato de la elección?');">
                                             @Html.AntiForgeryToken()

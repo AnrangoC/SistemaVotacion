@@ -2,20 +2,53 @@
     ViewData["Title"] = "Inicio";
 }
 
-<div class="container vh-100 d-flex justify-content-center align-items-center">
-    <div class="text-center">
-        <h1 class="mb-4">Sistema de Voto Electrónico</h1>
+<div class="min-vh-100 d-flex align-items-center"
+     style="background: linear-gradient(135deg, rgba(13,110,253,.10), rgba(0,0,0,.05));">
 
-        <div class="d-grid gap-3 col-6 mx-auto">
-            <!-- Botón Acceder -->
-            <a asp-controller="Aut" asp-action="Login" class="btn btn-primary btn-lg">
-                Acceder
-            </a>
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-9 col-lg-6">
 
-            <!-- Botón Resultados -->
-            <a asp-controller="Resultados" asp-action="Index" class="btn btn-secondary btn-lg">
-                Revisar resultados de elecciones
-            </a>
+                <div class="card shadow-lg border-0 text-center p-5">
+
+                    <!-- LOGO -->
+                    <div class="mb-4">
+                        <img src="~/imagenes/logo-utn.png"
+                             alt="UTN"
+                             style="max-height:120px; object-fit:contain;"
+                             onerror="this.style.display='none';" />
+                    </div>
+
+                    <h1 class="fw-bold mb-2">Sistema de Voto Electrónico</h1>
+
+                    <p class="text-muted mb-4">
+                        Plataforma oficial para la gestión y consulta de procesos electorales.
+                    </p>
+
+                    <div class="d-grid gap-3">
+                        <a asp-controller="Aut"
+                           asp-action="Login"
+                           class="btn btn-primary btn-lg">
+                            Acceder al Sistema
+                        </a>
+
+                        <a asp-controller="Resultados"
+                           asp-action="Index"
+                           class="btn btn-outline-dark btn-lg">
+                            Ver Resultados
+                        </a>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-top small text-muted">
+                        Universidad Técnica del Norte
+                        <br />
+                        © @DateTime.Now.Year
+                    </div>
+
+                </div>
+
+            </div>
         </div>
     </div>
+
 </div>
