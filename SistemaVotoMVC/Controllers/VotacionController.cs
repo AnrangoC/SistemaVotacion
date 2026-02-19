@@ -35,19 +35,6 @@ namespace SistemaVotoMVC.Controllers
 
             var client = _httpClientFactory.CreateClient("SistemaVotoAPI");
 
-            // 1) Validar token
-            var validarResp = await client.PostAsJsonAsync("api/Aut/ValidarToken", new
-            {
-                cedula = vm.Cedula,
-                codigo = vm.Token
-            });
-
-            if (!validarResp.IsSuccessStatusCode)
-            {
-                var msg = await validarResp.Content.ReadAsStringAsync();
-                TempData["Error"] = string.IsNullOrWhiteSpace(msg) ? "Token inválido o usado." : msg;
-                return View(vm);
-            }
 
             // 2) Traer elección activa
             var elecResp = await client.GetAsync("api/Elecciones/Activa");
@@ -209,7 +196,19 @@ namespace SistemaVotoMVC.Controllers
                     }
                 }
             }
+            // VALIDAR TOKEN JUSTO AL CONFIRMAR
+            var validarResp = await client.PostAsJsonAsync("api/Aut/ValidarToken", new
+            {
+                cedula = vm.Cedula,
+                codigo = vm.Token
+            });
 
+            if (!validarResp.IsSuccessStatusCode)
+            {
+                var msg = await validarResp.Content.ReadAsStringAsync();
+                TempData["Error"] = string.IsNullOrWhiteSpace(msg) ? "Token inválido, usado o expirado." : msg;
+                return RedirectToAction(nameof(Index));
+            }
             // ENVIAMOS TODO JUNTO
             var resp = await client.PostAsJsonAsync("api/VotosAnonimos/EmitirVotacion", new
             {
