@@ -49,7 +49,27 @@ namespace SistemaVotoAPI.Controllers
 
             return Ok(new { mensaje = "Votante marcado preventivamente." });
         }
+        [HttpGet("TestEmail")]
+        public async Task<IActionResult> TestEmail()
+        {
+            try
+            {
+                var emailDto = new EmailDto
+                {
+                    To = "cdanrangom@utn.edu.ec",
+                    Subject = "Prueba desde API",
+                    Body = "<b>Correo de prueba enviado desde Render</b>"
+                };
 
+                await _emailService.SendEmail(emailDto, Array.Empty<byte>(), "prueba.pdf");
+
+                return Ok("Correo enviado correctamente.");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Error enviando correo: " + ex.Message);
+            }
+        }
         [HttpPost("EmitirVotacion")]
         public async Task<IActionResult> EmitirVotacion([FromBody] RegistroVotoDto request)
         {
