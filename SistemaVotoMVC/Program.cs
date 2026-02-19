@@ -1,10 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authentication.Cookies;
-using System.Text.Json;
-
-// Nuevo
 using Microsoft.AspNetCore.DataProtection;
+using System.Text.Json;
 using System.IO;
-
 using SistemaVotoMVC.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,8 +14,7 @@ builder.Services.AddControllersWithViews()
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     });
 
-// Nuevo
-// Cookies compartidas con API (llaves dentro de la solución)
+// 2. Cookies compartidas con API
 builder.Services.AddDataProtection()
     .PersistKeysToFileSystem(
         new DirectoryInfo(
@@ -27,29 +23,31 @@ builder.Services.AddDataProtection()
     )
     .SetApplicationName("SistemaVotoApp");
 
-// 2. Autenticación por Cookies
+// 3. Autenticación por Cookies
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
         options.Cookie.Name = "SistemaVotoAuth";
-        options.LoginPath = "/Aut/Login";           // Si no está logueado
-        options.AccessDeniedPath = "/Aut/Login";    // Si no tiene rol
+        options.LoginPath = "/Aut/Login";
+        options.AccessDeniedPath = "/Aut/Login";
         options.ExpireTimeSpan = TimeSpan.FromMinutes(60);
         options.SlidingExpiration = true;
     });
 
-// 3. Cliente HTTP para consumir la API
+// 4. Cliente HTTP para consumir la API
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddTransient<ForwardCookieHandler>();
 
+var apiBaseUrl =
+    builder.Configuration["ApiSettings:BaseUrl"]
+    ?? Environment.GetEnvironmentVariable("ApiSettings__BaseUrl")
+    ?? "https://localhost:7062/"; // fallback local
+
 builder.Services.AddHttpClient("SistemaVotoAPI", client =>
 {
-    client.BaseAddress = new Uri("https://localhost:7062/");
+    client.BaseAddress = new Uri(apiBaseUrl);
 })
 .AddHttpMessageHandler<ForwardCookieHandler>();
-
-// 4. HttpContextAccessor (claims, usuario, etc.)
-builder.Services.AddHttpContextAccessor();
 
 var app = builder.Build();
 
@@ -65,13 +63,13 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-// IMPORTANTE: Auth primero, luego Authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
-// 6. Ruta por defecto → Ventana inicial
+// 6. Ruta por defecto
 app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
