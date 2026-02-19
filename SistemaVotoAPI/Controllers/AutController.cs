@@ -124,7 +124,7 @@ namespace SistemaVotoAPI.Controllers
             _context.TokensAcceso.Add(token);
             await _context.SaveChangesAsync();
 
-            // Respuesta simple (tu MVC ya la muestra en TempData)
+            // Respuesta simple
             return Ok(new
             {
                 Cedula = votante.Cedula,
