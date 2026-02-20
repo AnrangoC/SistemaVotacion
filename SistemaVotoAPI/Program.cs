@@ -116,7 +116,6 @@ app.UseStaticFiles();
 
 app.UseHttpsRedirection();
 
-// Nuevo
 app.UseAuthentication();
 
 app.UseAuthorization();

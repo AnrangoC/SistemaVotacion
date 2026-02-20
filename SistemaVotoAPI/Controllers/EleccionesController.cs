@@ -126,7 +126,7 @@ namespace SistemaVotoAPI.Controllers
             var existente = await _context.Elecciones.FindAsync(id);
             if (existente == null) return NotFound();
 
-            // Bloqueo de edición si ya empezó (según tu lógica actual)
+            // Bloqueo de edición si ya empezó 
             if (DateTime.Now >= existente.FechaInicio)
             {
                 return BadRequest("No se puede editar una elección que ya ha comenzado o que ya finalizó.");
@@ -141,7 +141,7 @@ namespace SistemaVotoAPI.Controllers
 
             var estadoAnterior = existente.Estado;
 
-            // aquí el nuevo estado debe calcularse con las fechas NUEVAS (eleccion)
+            // aquí el nuevo estado debe calcularse con las fechas NUEVAS de elección
             var nuevoEstado = CalcularEstado(eleccion, DateTime.Now);
 
             // RESET MASIVO si (por alguna razón) desde aquí llega a pasar a ACTIVA

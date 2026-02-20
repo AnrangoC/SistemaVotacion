@@ -58,14 +58,14 @@ namespace SistemaVotoAPI.Controllers
             return Ok(response);
         }
 
-        // DTO interno SOLO para soportar envío por body si algún día se usas desde Swagger/Postman
+        // DTO interno SOLO para soportar envío por body 
         public class GenerarTokenRequest
         {
             public string CedulaJefe { get; set; } = string.Empty;
             public string CedulaVotante { get; set; } = string.Empty;
         }
 
-        // Generar token: soporta QUERY o BODY
+        // Generar token: soporta 
         // QUERY:  POST api/Aut/GenerarToken?cedulaJefe=...&cedulaVotante=...
         // BODY:   { "cedulaJefe": "...", "cedulaVotante": "..." }
         [HttpPost("GenerarToken")]

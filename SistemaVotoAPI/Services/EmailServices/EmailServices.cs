@@ -20,7 +20,7 @@ namespace SistemaVotoAPI.Services.EmailServices
         public async Task SendEmail(EmailDto request, byte[] attachment, string fileName)
         {
             var email = new MimeMessage();
-            // Leemos el remitente desde tu appsettings.json
+            // Leemos el remitente desde appsettings.json
             email.From.Add(MailboxAddress.Parse(_config.GetSection("EmailUsername").Value));
             email.To.Add(MailboxAddress.Parse(request.To));
             email.Subject = request.Subject;
