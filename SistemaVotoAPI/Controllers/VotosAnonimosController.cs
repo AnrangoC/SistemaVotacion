@@ -177,7 +177,7 @@ namespace SistemaVotoAPI.Controllers
                                 Body = $"Hola {votante.NombreCompleto}, adjuntamos tu certificado de votación."
                             };
 
-                            await _emailService.SendEmail(emailDto, pdfBytes, $"Certificado{votante.Cedula}.pdf");
+                            //await _emailService.SendEmail(emailDto, pdfBytes, $"Certificado{votante.Cedula}.pdf");
                         }
                         catch
                         {
